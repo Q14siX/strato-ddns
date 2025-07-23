@@ -36,7 +36,9 @@ apt-get install -y \
   python3-flask-session \
   python3-flask-limiter \
   python3-bcrypt \
-  python3-cryptography
+  python3-cryptography \
+  ca-certificates \
+  sudo
 
 mkdir -p "$APP_DIR/templates"
 
