@@ -36,11 +36,15 @@ scripts/
 ├── strato-ddns-credentials.sh # Setzt neue Zugangsdaten
 ```
 
+---
+
 ## ⚙️ Schnellstart
 
 Du brauchst lediglich `bash` und `wget`.  
 Alles andere wird automatisch erledigt.  
 Du kannst das Menü **direkt vom letzten Release auf GitHub starten**, ohne erst Dateien manuell herunterladen zu müssen.
+
+---
 
 ### 📥 Direkt starten:
 ```bash
@@ -49,10 +53,14 @@ bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/
 
 💡 Dieser Befehl lädt die aktuelle `strato-ddns-start.sh` aus dem neuesten Release, prüft den Installationsstatus und startet dann das Menü.
 
+---
+
 ## 🖥️ Web-Frontend
 
 Nach der Installation läuft der Web-Frontend-Server standardmäßig auf Port `8080`.  
 Dort kannst du dich mit den von dir gesetzten Zugangsdaten anmelden und deine Domains verwalten.
+
+---
 
 ## 🔄 Verwaltung per Menü
 
@@ -65,6 +73,8 @@ Das Menü bietet folgende Optionen:
 | 🗑️ **Deinstallation** | Entfernt den Dienst vollständig |
 | 👋 **Beenden** | Schließt das Menü |
 
+---
+
 ## 💻 Anforderungen
 
 - Linux-Server oder -VM
@@ -73,6 +83,8 @@ Das Menü bietet folgende Optionen:
 - `python3`
 - `systemd`
 - optional: `git` (wenn du das Repository klonen möchtest)
+
+---
 
 ## ❤️ Autor
 
