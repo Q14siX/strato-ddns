@@ -82,7 +82,6 @@ Das Menü bietet folgende Optionen:
 - `wget`
 - `python3`
 - `systemd`
-- optional: `git` (wenn du das Repository klonen möchtest)
 
 ---
 
