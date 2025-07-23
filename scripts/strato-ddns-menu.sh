@@ -4,7 +4,7 @@ set -e
 clear
 
 # GitHub-Repo-URL (ohne Datei)
-REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
+REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts"
 
 # Prüfen, ob als root
 if [ "$EUID" -ne 0 ]; then
