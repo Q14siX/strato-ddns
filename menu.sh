@@ -69,10 +69,14 @@ while true; do
             read -rp "➡️  Drücke [ENTER], um das Menü zu schließen …"
             clear
             echo "🗑️  Dienst wurde deinstalliert. Bis bald!"
+            sleep 1
+            clear
             exit 0
             ;;
         [Xx])
             echo "👋 Bis bald!"
+            sleep 1
+            clear
             exit 0
             ;;
         *)
