@@ -14,7 +14,6 @@ fi
 
 APP_DIR="/opt/strato-ddns"
 SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
-PYTHON_PACKAGES="flask flask-session flask-limiter bcrypt cryptography"
 
 if [ -d "$APP_DIR" ]; then
   echo "== Strato-DDNS scheint installiert zu sein =="
@@ -30,10 +29,14 @@ fi
 
 echo "== System-Update & Installation benötigter Pakete =="
 apt-get update
-apt-get install -y python3 python3-pip
-
-echo "== Installiere Python-Module =="
-pip3 install --quiet --root-user-action=ignore $PYTHON_PACKAGES >/dev/null
+apt-get install -y \
+  python3 \
+  python3-pip \
+  python3-flask \
+  python3-flask-session \
+  python3-flask-limiter \
+  python3-bcrypt \
+  python3-cryptography
 
 mkdir -p "$APP_DIR/templates"
 
