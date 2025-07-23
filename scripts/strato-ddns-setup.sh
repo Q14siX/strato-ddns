@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# =============================================
+# Strato DDNS - Installation & Deinstallation
+# Datei: strato-ddns-setup.sh
+# Installiert oder entfernt den Strato-DDNS-Dienst.
+# =============================================
+
 if [ "$EUID" -ne 0 ]; then
   echo "❌ Bitte führe dieses Skript als root oder mit sudo aus."
   exit 1
