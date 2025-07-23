@@ -22,6 +22,9 @@ Zusätzlich bietet es eine intuitive Verwaltung über ein webbasiertes Frontend 
 ✅ Installations-, Deinstallations- und Verwaltungsskripte  
 ✅ Systemd-Service zur automatischen Ausführung beim Boot  
 ✅ Start direkt vom GitHub-Repository möglich — keine Installation nötig
+✅ **Protokollierung aller Änderungen und Updates in log.xml**  
+✅ **Responsives Log-Frontend als neue Hauptseite (tabellarische, farbige Ansicht aller Updates)**  
+✅ **Navigationsmenü (Log, Konfiguration, Logout) im Web-Frontend**
 
 ---
 
@@ -55,8 +58,12 @@ bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/
 
 ## 🖥️ Web-Frontend
 
-Nach der Installation läuft der Web-Frontend-Server standardmäßig auf Port `8080`.  
-Dort kannst du dich mit den von dir gesetzten Zugangsdaten anmelden und deine Domains verwalten.
+Nach der Installation läuft der Web-Frontend-Server standardmäßig auf Port `5000`.
+
+**Neue Hauptseite nach Login:**  
+Du siehst ein Protokoll aller Updates und Änderungen in einer responsiven, tabellarischen Übersicht (`log.html`).  
+Über das Menü kannst du jederzeit zur Konfiguration (`/config`) oder zurück zum Log wechseln.  
+Jeder Update-Vorgang (ob manuell oder automatisch) wird mit Datum, Uhrzeit, Auslöser, Domain, IP-Adresse(n) und Status dokumentiert.
 
 ### 🔐 Login
 
@@ -68,16 +75,28 @@ Dort kannst du dich mit den von dir gesetzten Zugangsdaten anmelden und deine Do
 
 ---
 
-## 🔄 Verwaltung per Menü
+## 🔄 Navigation im Web-Frontend
 
-Das Menü bietet folgende Optionen:
+Im Web-Frontend gibt es ein Navigationsmenü oben auf allen Seiten:
 
-| Option | Beschreibung |
-|-------|---------------|
-| 🔓 **Sperre aufheben** | Entfernt eine mögliche Sperre nach zu vielen Fehlversuchen |
-| 🔑 **Zugangsdaten ändern** | Ändert die Zugangsdaten für das Web-Frontend & Strato |
-| 🗑️ **Deinstallation** | Entfernt den Dienst vollständig |
-| 👋 **Beenden** | Schließt das Menü |
+| Menüpunkt       | Beschreibung                                         |
+|-----------------|------------------------------------------------------|
+| **Log**         | Protokoll aller Updates/Aktionen (Startseite)        |
+| **Konfiguration** | Zugangsdaten und Domains verwalten                |
+| **Logout**      | Aktuelle Session beenden                             |
+
+---
+
+## 🔄 Verwaltung per Menü (Terminal)
+
+Das Terminal-Menü bietet folgende Optionen:
+
+| Option | Beschreibung         |
+|--------|----------------------|
+| 1      | Sperre aufheben      |
+| 2      | Zugangsdaten ändern  |
+| 9      | Deinstallation       |
+| X      | Beenden              |
 
 ---
 
