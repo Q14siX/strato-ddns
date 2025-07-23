@@ -7,17 +7,17 @@ set -e
 # Lädt und startet Unterskripte aus dem Repo.
 # =============================================
 
-# GitHub-Repo-URL (Basis für alle Skripte)
-REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts"
-
-# Bildschirm leeren
-clear
-
 # Prüfen, ob als root
 if [ "$EUID" -ne 0 ]; then
   echo "❌ Bitte führe dieses Skript als root oder mit sudo aus."
   exit 1
 fi
+
+# GitHub-Repo-URL (Basis für alle Skripte)
+REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts"
+
+# Bildschirm leeren
+clear
 
 # Funktion zum direkten Ausführen eines Skripts aus dem Repo
 run_remote_script() {
@@ -29,11 +29,13 @@ run_remote_script() {
 
 # Prüfen, ob bereits installiert (Verzeichnis vorhanden?)
 if [ ! -d /opt/strato-ddns ]; then
-    echo "🚀 Erste Ausführung erkannt — Installation wird gestartet …"
+    echo "🚀 Installation wird gestartet …"
     run_remote_script "strato-ddns-setup.sh"
     echo
     echo "✅ Installation abgeschlossen. Starte das Menü …"
     sleep 1
+else
+    echo "📥 Lade aktuelles Menü von GitHub …"
 fi
 
 # Menü anzeigen
