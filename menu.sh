@@ -10,57 +10,54 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# erster Aufruf → Installation
-if [ ! -d "$APP_DIR" ]; then
-  echo "🚀 Erster Start erkannt. Starte Installation…"
-  ./installer.sh
-  exit 0
-fi
+# GitHub-Repo-URL (ohne Datei)
+REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 
-# Funktion zum Warten
-pause() {
-  echo
-  read -p "↩️  Drücken Sie [Enter], um ins Menü zurückzukehren…"
+# Funktion zum direkten Ausführen eines Skripts aus dem Repo
+run_remote_script() {
+    local script="$1"
+    bash <(wget -qO- "$REPO_URL/$script")
 }
 
-# Menü
-while true; do
-  echo "=============================="
-  echo " Strato-DDNS Verwaltung"
-  echo "=============================="
-  echo
-  echo "1) Sperre zurücksetzen"
-  echo "2) Zugangsdaten ändern"
-  echo "9) Deinstallieren"
-  echo "X) Beenden"
-  echo
-  read -p "Bitte wählen: " choice
+# Prüfen, ob bereits installiert
+if [ ! -f /opt/strato-ddns/installed ]; then
+    echo "➡️  Erste Ausführung — Installation wird gestartet…"
+    run_remote_script "installer.sh"
+    exit 0
+fi
 
-  case "$choice" in
-    1)
-      echo "🔓 Sperre wird zurückgesetzt…"
-      ./lock.sh
-      pause
-      ;;
-    2)
-      echo "👤 Zugangsdaten werden geändert…"
-      ./user.sh
-      echo "🔓 Sperre wird zurückgesetzt…"
-      ./lock.sh
-      pause
-      ;;
-    9)
-      echo "🗑️ Deinstallation…"
-      ./installer.sh
-      exit 0
-      ;;
-    [Xx])
-      echo "👋 Beende…"
-      exit 0
-      ;;
-    *)
-      echo "❌ Ungültige Eingabe!"
-      sleep 1
-      ;;
-  esac
+# Menü anzeigen
+while true; do
+    clear
+    echo "====== Strato DDNS Verwaltung ======"
+    echo "1) Sperre aufheben"
+    echo "2) Zugangsdaten ändern"
+    echo "9) Deinstallieren"
+    echo "X) Beenden"
+    echo "===================================="
+    read -rp "Bitte wähle eine Option: " option
+
+    case "$option" in
+        1)
+            echo "🔓 Sperre wird zurückgesetzt…"
+            run_remote_script "lock.sh"
+            ;;
+        2)
+            echo "👤 Zugangsdaten werden geändert und Sperre zurücksetzen…"
+            run_remote_script "user.sh"
+            run_remote_script "lock.sh"
+            ;;
+        9)
+            echo "🗑️ Deinstallation…"
+            run_remote_script "installer.sh"
+            ;;
+        [Xx])
+            echo "👋 Beendet."
+            exit 0
+            ;;
+        *)
+            echo "❌ Ungültige Auswahl."
+            sleep 1
+            ;;
+    esac
 done
