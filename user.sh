@@ -3,6 +3,7 @@ set -e
 
 CONFIG_FILE="/opt/strato-ddns/config.json"
 SERVICE_NAME="strato-ddns"
+REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 
 if [ "$EUID" -ne 0 ]; then
   echo "❌ Bitte führe dieses Skript als root oder mit sudo aus."
@@ -64,3 +65,8 @@ EOF
 echo "[+] Starte den Dienst $SERVICE_NAME neu…"
 systemctl restart "$SERVICE_NAME"
 echo "✅ Dienst $SERVICE_NAME wurde neu gestartet."
+
+echo
+echo "[+] Hebe eventuelle Sperre auf …"
+bash <(wget -qO- "$REPO_URL/lock.sh")
+echo "✅ Sperre wurde aufgehoben."
