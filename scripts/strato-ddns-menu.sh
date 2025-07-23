@@ -1,10 +1,17 @@
 #!/bin/bash
 set -e
 
-clear
+# =============================================
+# Strato DDNS Verwaltung - Menü
+# Datei: strato-ddns-menu.sh
+# Lädt und startet Unterskripte aus dem Repo.
+# =============================================
 
-# GitHub-Repo-URL (ohne Datei)
+# GitHub-Repo-URL (Basis für alle Skripte)
 REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts"
+
+# Bildschirm leeren
+clear
 
 # Prüfen, ob als root
 if [ "$EUID" -ne 0 ]; then
@@ -23,7 +30,7 @@ run_remote_script() {
 # Prüfen, ob bereits installiert (Verzeichnis vorhanden?)
 if [ ! -d /opt/strato-ddns ]; then
     echo "🚀 Erste Ausführung erkannt — Installation wird gestartet …"
-    run_remote_script "installer.sh"
+    run_remote_script "strato-ddns-setup.sh"
     echo
     echo "✅ Installation abgeschlossen. Starte das Menü …"
     sleep 1
@@ -39,7 +46,7 @@ while true; do
     echo
     echo "  2) 🔑 Zugangsdaten ändern"
     echo "     ➝ Ändert die Zugangsdaten für das Web-Frontend und Strato."
-    echo "        (Sperre wird ggf. durch user.sh selbst aufgehoben)"
+    echo "        (Sperre wird ggf. durch strato-ddns-credentials.sh selbst aufgehoben)"
     echo
     echo "  9) 🗑️ Deinstallieren"
     echo "     ➝ Entfernt den Dienst komplett vom System."
@@ -54,17 +61,17 @@ while true; do
         1)
             echo "🔄 Starte: Sperre aufheben …"
             sleep 1
-            run_remote_script "lock.sh"
+            run_remote_script "strato-ddns-lock.sh"
             ;;
         2)
             echo "🔄 Starte: Zugangsdaten ändern …"
             sleep 1
-            run_remote_script "user.sh"
+            run_remote_script "strato-ddns-credentials.sh"
             ;;
         9)
             echo "🔄 Starte: Deinstallation …"
             sleep 1
-            bash <(wget -qO- "$REPO_URL/installer.sh")
+            bash <(wget -qO- "$REPO_URL/strato-ddns-setup.sh")
             echo
             read -rp "➡️  Drücke [ENTER], um das Menü zu schließen …"
             clear
