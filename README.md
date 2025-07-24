@@ -228,5 +228,3 @@ Frei zur Nutzung, Änderung und Weiterverbreitung unter Nennung der ursprünglic
 
 ## ❗ Hinweis  
 *Dieses Projekt steht in keiner Verbindung zur Strato AG, AVM oder anderen Dritten. Die Nutzung erfolgt auf eigenes Risiko.*
-
----
