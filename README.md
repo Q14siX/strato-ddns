@@ -12,7 +12,9 @@
 ---
 
 ![Login-Seite](images/frontend/login.png)
+![Protokoll](images/frontend/log.png)
 ![Konfiguration](images/frontend/config.png)
+![Update](images/frontend/update.png)
 
 ---
 
@@ -168,10 +170,8 @@ http://<DEINE_SERVER_IP>:5000/auto?username=<username>&password=<pass>&myip=<ip6
 
 **Komplett deinstallieren:**
 ```sh
-sudo bash /opt/strato-ddns/scripts/strato-ddns-deinstall.sh
+bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/strato-ddns-start.sh)
 ```
-
-Weitere Skripte zur Verwaltung und Passwortänderung befinden sich im Skriptverzeichnis `/opt/strato-ddns/scripts/`.
 
 ---
 
@@ -180,7 +180,7 @@ Weitere Skripte zur Verwaltung und Passwortänderung befinden sich im Skriptverz
 ```
 strato-ddns/
 ├── scripts/                 # Setup- und Verwaltungs-Skripte
-├── templates/               # Web-Templates für Config, Login, Log, Update
+├── templates/               # Web-Templates für die Seiten des Logins, Protokolls, Konfiguration und Update
 ├── images/frontend/         # Screenshots für README & Dokumentation
 ├── LICENSE                  # MIT Lizenz
 └── README.md                # Diese Datei
@@ -228,8 +228,8 @@ Frei zur Nutzung, Änderung und Weiterverbreitung unter Nennung der ursprünglic
 
 ## Screenshots
 
-| Login-Seite                    | Konfigurations-Seite        |
-| ------------------------------ | --------------------------- |
-| ![login](images/frontend/login.png) | ![config](images/frontend/config.png) |
+| Login-Seite                    | Protokoll-Seite                | Konfigurations-Seite           | Update-Seite                   |
+| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
+| ![login](images/frontend/login.png) | ![config](images/frontend/log.png) | ![config](images/frontend/config.png) | ![config](images/frontend/update.png) |
 
 ---
