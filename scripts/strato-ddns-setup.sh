@@ -58,18 +58,18 @@ read -s -p "Passwort: " WEBPASS
 echo
 
 # ====== config.json erstellen über ausgelagertes Skript ======
-run_remote_script "/scripts/strato-ddns-config.sh"
+run_remote_script "scripts/strato-ddns-config.sh"
 
 # ========== App und Templates einspielen ==========
-run_remote_script "/scripts/strato-ddns-app.sh"
+run_remote_script "scripts/strato-ddns-app.sh"
 
-run_remote_script "/templates/default/strato-ddns-log.sh"
-run_remote_script "/templates/default/strato-ddns-config.sh"
-run_remote_script "/templates/default/strato-ddns-login.sh"
-run_remote_script "/templates/default/strato-ddns-update.sh"
+run_remote_script "templates/default/strato-ddns-log.sh"
+run_remote_script "templates/default/strato-ddns-config.sh"
+run_remote_script "templates/default/strato-ddns-login.sh"
+run_remote_script "templates/default/strato-ddns-update.sh"
 
 # ========== Systemd-Service einspielen ==========
-run_remote_script "/scripts/strato-ddns-app.sh"
+run_remote_script "scripts/strato-ddns-service.sh"
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
@@ -81,5 +81,3 @@ echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ip
 echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ip6addr>"
 echo
 echo "🆘 Für weitere Informationen nutzen Sie die Hilfe oder das Handbuch Ihrer Fritz!Box."
-
-echo 'test'
