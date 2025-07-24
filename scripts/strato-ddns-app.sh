@@ -8,6 +8,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_limiter.errors import RateLimitExceeded
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+TIMEZONE = ZoneInfo("Europe/Berlin")
+
 from collections import defaultdict
 from urllib.parse import urljoin
 
@@ -281,7 +284,7 @@ def testmail():
     ms["smtp_server"] = request.form.get("mail_smtp_server", "")
     ms["smtp_port"] = request.form.get("mail_smtp_port", "")
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(TIMEZONE)
     event = "Testmail"
     trigger = "manuell"
     subject = get_mail_subject(config, "Testnachricht")
@@ -324,7 +327,7 @@ def update():
     ip = get_public_ip()
     hostnames = config.get("domains", [])
     results = []
-    now = datetime.now()
+    now = datetime.now(TIMEZONE)
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Update"
     trigger = "manuell"
@@ -357,7 +360,7 @@ def auto():
     req_ip = request.args.get('myip')
     ip_list = [i.strip() for i in req_ip.split(',')] if req_ip else [get_public_ip()]
     client_ip = request.remote_addr
-    now = datetime.now()
+    now = datetime.now(TIMEZONE)
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Auto-Update"
     trigger = "automatisch"
