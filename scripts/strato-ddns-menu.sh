@@ -47,8 +47,7 @@ while true; do
     echo "     ➝ Entfernt eine mögliche Sperre nach zu vielen Login-Versuchen."
     echo
     echo "  2) 🔑 Zugangsdaten ändern"
-    echo "     ➝ Ändert die Zugangsdaten für das Web-Frontend und Strato."
-    echo "        (Sperre wird ggf. durch strato-ddns-credentials.sh selbst aufgehoben)"
+    echo "     ➝ Ändert die Zugangsdaten für das Web-Frontend."
     echo
     echo "  9) 🗑️ Deinstallieren"
     echo "     ➝ Entfernt den Dienst komplett vom System."
