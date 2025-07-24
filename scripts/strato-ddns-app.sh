@@ -128,7 +128,7 @@ def build_html_mail(subject, entries, timestamp, event, trigger):
     """
     return html
 
-def send_mail(config, subject, body, decrypt_pw=None):
+def send_mail(config, subject, entries, timestamp, event, trigger, decrypt_pw=None):
     ms = get_mail_settings(config)
     if not ms["enabled"]:
         return False, "Mailversand deaktiviert"
@@ -137,13 +137,15 @@ def send_mail(config, subject, body, decrypt_pw=None):
         if not recipients:
             return False, "Keine Empfänger angegeben"
 
-        html_body = build_html_mail(subject, body)
+        html_body = build_html_mail(subject, entries, timestamp, event, trigger)
+        plain_body = "\n".join(f"{d}: {ip} – {status}" for d, ip, status in entries)
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = ms["sender"]
         msg["To"] = ", ".join(recipients)
 
-        part_text = MIMEText(body, "plain", "utf-8")
+        part_text = MIMEText(plain_body, "plain", "utf-8")
         part_html = MIMEText(html_body, "html", "utf-8")
 
         msg.attach(part_text)
@@ -262,7 +264,6 @@ def testmail():
     config = load_config()
     ms = get_mail_settings(config)
 
-    # Maildaten temporär überschreiben mit den Formwerten
     ms["enabled"] = True
     ms["recipients"] = request.form.get("mail_recipients", "")
     ms["sender"] = request.form.get("mail_sender", "")
@@ -272,45 +273,17 @@ def testmail():
     ms["smtp_server"] = request.form.get("mail_smtp_server", "")
     ms["smtp_port"] = request.form.get("mail_smtp_port", "")
 
-    subject = get_mail_subject(config, "Testnachricht")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     event = "Testmail"
     trigger = "manuell"
+    subject = get_mail_subject(config, "Testnachricht")
     entries = [("test.domain", "127.0.0.1", "OK")]
 
-    html_body = build_html_mail(subject, entries, timestamp, event, trigger)
-    plain_body = "Testnachricht von Strato DDNS"
-
-    try:
-        recipients = [a.strip() for a in ms["recipients"].split(",") if a.strip()]
-        if not recipients:
-            return "Keine Empfänger angegeben", 400
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = ms["sender"]
-        msg["To"] = ", ".join(recipients)
-        part_text = MIMEText(plain_body, "plain", "utf-8")
-        part_html = MIMEText(html_body, "html", "utf-8")
-        msg.attach(part_text)
-        msg.attach(part_html)
-
-        smtp_user = ms["smtp_user"]
-        smtp_pass = ms["smtp_pass"]
-        smtp_server = ms["smtp_server"]
-        smtp_port = int(ms["smtp_port"]) if str(ms["smtp_port"]).isdigit() else 587
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        if smtp_user and smtp_pass:
-            server.login(smtp_user, smtp_pass)
-        server.sendmail(ms["sender"], recipients, msg.as_string())
-        server.quit()
+    success, info = send_mail(config, subject, entries, timestamp, event, trigger)
+    if success:
         return "OK", 200
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())  # Optional für Debug
-        return f"Fehler: {str(e)}", 500
+    else:
+        return f"Fehler: {info}", 500
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per hour", methods=["POST"], error_message="Zu viele Fehlversuche. Bitte später erneut versuchen.")
@@ -343,11 +316,11 @@ def update():
     ip = get_public_ip()
     hostnames = config.get("domains", [])
     results = []
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now()
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Update"
     trigger = "manuell"
     mail_settings = get_mail_settings(config)
-    mail_needed = mail_settings.get("enabled") and mail_settings.get("notify_on_success")
 
     for domain in hostnames:
         try:
@@ -357,15 +330,14 @@ def update():
             )
             text_raw = resp.text.strip() if resp.status_code == 200 else f"error {resp.status_code}"
             text = text_raw.split(" ")[0]
-        except Exception as e:
+        except Exception:
             text = "error"
         results.append((domain, ip, text))
-        log_entry(now, event, trigger, domain, ip, text)
+        log_entry(timestamp, event, trigger, domain, ip, text)
 
-    if mail_needed:
+    if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, f"{event} erfolgreich")
-        html_body = build_html_mail(subject, results, now, event, trigger)
-        send_mail(config, subject, html_body)
+        send_mail(config, subject, results, timestamp, event, trigger)
 
     return render_template('update.html', ip=ip, results=results)
 
@@ -393,8 +365,7 @@ def auto():
             results.append((domain, ",".join(ip_list), "abuse"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_abuse"):
             subject = get_mail_subject(config, "Sperre durch Missbrauchsversuche")
-            html_body = build_html_mail(subject, results, timestamp, "Sperre", trigger)
-            send_mail(config, subject, html_body)
+            send_mail(config, subject, results, timestamp, "Sperre", trigger)
         return Response(f"abuse {ip_list[0]}", mimetype='text/plain')
 
     # Keine IP verfügbar
@@ -404,8 +375,7 @@ def auto():
             results.append((domain, "keine IP", "noip"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_noip"):
             subject = get_mail_subject(config, "Keine IP verfügbar")
-            html_body = build_html_mail(subject, results, timestamp, event, trigger)
-            send_mail(config, subject, html_body)
+            send_mail(config, subject, results, timestamp, event, trigger)
         return Response("noip", mimetype="text/plain")
 
     # Web-Login fehlgeschlagen
@@ -416,8 +386,7 @@ def auto():
             results.append((domain, ",".join(ip_list), "badauth-web"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_badauth"):
             subject = get_mail_subject(config, "Login fehlgeschlagen (Web)")
-            html_body = build_html_mail(subject, results, timestamp, "Login fehlgeschlagen", trigger)
-            send_mail(config, subject, html_body)
+            send_mail(config, subject, results, timestamp, "Login fehlgeschlagen", trigger)
         return Response(f"badauth {ip_list[0]}", mimetype='text/plain')
 
     # Strato-Update
@@ -451,8 +420,7 @@ def auto():
     # Mail bei Erfolg
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, "Update erfolgreich")
-        html_body = build_html_mail(subject, results, timestamp, event, trigger)
-        send_mail(config, subject, html_body)
+        send_mail(config, subject, results, timestamp, event, trigger)
 
     return Response(f"{worst} {worst_ip}", mimetype='text/plain')
 
