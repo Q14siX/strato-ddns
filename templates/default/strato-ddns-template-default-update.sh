@@ -30,14 +30,23 @@ cat > "$APP_DIR/templates/update.html" <<'EOF_HTML'
           <h3 class="card-title mb-4">Strato DDNS Update</h3>
           <p>Aktualisierte öffentliche IP: <strong>{{ ip }}</strong></p>
           <ul class="list-group">
-            {% for domain, result in results %}
-            <li class="list-group-item d-flex justify-content-between">
-              <span>{{ domain }}</span>
-              <span class="badge {% if result.lower().startswith('good') or result.lower().startswith('nochg') %}bg-success{% else %}bg-danger{% endif %}">{{ result }}</span>
+            {% for domain, returned_ip, result in results %}
+            <li class="list-group-item d-flex justify-content-between flex-column flex-md-row">
+              <div>
+                <strong><a href="http://{{ domain }}" target="_blank" rel="noopener">{{ domain }}</a></strong><br>
+                <small class="text-muted">gemeldete IP: {{ returned_ip }}</small>
+              </div>
+              <span class="badge mt-2 mt-md-0 {% if result.lower().startswith('good') or result.lower().startswith('nochg') %}bg-success{% else %}bg-danger{% endif %}">
+                {{ result }}
+              </span>
             </li>
             {% endfor %}
           </ul>
-          <a href="/config" class="btn btn-primary">Zurück zur Konfiguration</a>
+          <div class="row mt-4">
+            <div class="col-12 d-grid gap-2">
+              <a href="/config" class="btn btn-primary">Zurück zur Konfiguration</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
