@@ -21,8 +21,6 @@ SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
 run_remote_script() {
     local script="$1"
     bash <(wget -qO- "$REPO_URL/$script")
-    echo
-    read -rp "➡️  Drücke [ENTER], um zurück zum Menü zu gelangen …"
 }
 
 # Deinstallation bei bestehender Installation
