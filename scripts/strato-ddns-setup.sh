@@ -81,3 +81,5 @@ echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ip
 echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ip6addr>"
 echo
 echo "🆘 Für weitere Informationen nutzen Sie die Hilfe oder das Handbuch Ihrer Fritz!Box."
+
+echo 'test'
