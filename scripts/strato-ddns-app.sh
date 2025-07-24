@@ -409,7 +409,7 @@ def auto():
             log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Update", "automatisch", domain, returned_ip, result)
             log_text += f"{domain} ({returned_ip}): {result}\n"
 
-    if mail_settings.get("enabled") and mail_settings.get("notify_on_success") and worst in ("good", "nochg"):
+    if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, "Update erfolgreich")
         html_body = build_html_mail(subject, log_text)
         send_mail(config, subject, log_text)
