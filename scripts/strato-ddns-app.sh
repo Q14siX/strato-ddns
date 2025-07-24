@@ -77,6 +77,14 @@ def get_mail_subject(config, suffix=None):
     return subject
 
 def build_html_mail(subject, entries, timestamp, event, trigger):
+    from datetime import datetime
+
+    # Timestamp-String direkt umwandeln (und unter demselben Namen behalten)
+    try:
+        timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
+    except:
+        pass  # falls z. B. schon im richtigen Format
+    
     html_rows = ""
     for domain, ip, status in entries:
         color = "#198754" if status.lower().startswith(("good", "nochg")) else "#dc3545"
