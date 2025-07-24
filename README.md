@@ -221,8 +221,10 @@ Frei zur Nutzung, Änderung und Weiterverbreitung unter Nennung der ursprünglic
 
 ## Screenshots
 
-| Login-Seite                    | Protokoll-Seite                | Konfigurations-Seite           | Update-Seite                   |
-| ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
-| ![login](images/frontend/login.png) | ![config](images/frontend/log.png) | ![config](images/frontend/config_1.png) ![config](images/frontend/config_2.png) | ![config](images/frontend/update.png) |
+| Login-Seite                    | Protokoll-Seite                |
+| ------------------------------ | ------------------------------ |
+| ![login](images/frontend/login.png) | ![config](images/frontend/log.png) |
+| Konfigurations-Seite           | Update-Seite                   |
+| ![config](images/frontend/config_1.png) ![config](images/frontend/config_2.png) | ![config](images/frontend/update.png) |
 
 ---
