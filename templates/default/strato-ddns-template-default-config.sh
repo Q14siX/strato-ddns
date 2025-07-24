@@ -60,7 +60,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                       <textarea class="form-control" name="domains" rows="5">{{ domains }}</textarea>
                     </div>
                     <div class="mb-3">
-                      <button type="submit" class="btn btn-success" name="run_update" value="1">Update jetzt ausführen</button>
+                      <button type="submit" class="btn btn-primary" name="run_update" value="1">Update jetzt ausführen</button>
                     </div>
                   </div>
                 </div>
@@ -125,7 +125,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                       <label class="form-check-label" for="mail_notify_abuse">⛔ DDNS Sperre durch Missbrauchsversuche</label>
                     </div>
                     <div class="mb-3">
-                      <button type="button" class="btn btn-secondary" id="testMailBtn">Mail-Einstellungen testen</button>
+                      <button type="button" class="btn btn-primary" id="testMailBtn">Mail-Einstellungen testen</button>
                       <span id="mailTestResult" class="ms-2"></span>
                     </div>
                   </div>
