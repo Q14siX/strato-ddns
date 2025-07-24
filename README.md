@@ -27,6 +27,8 @@
 - [❓ FAQ](#-faq)
 - [💬 Support & Weiterentwicklung](#-support--weiterentwicklung)
 - [📄 Lizenz](#-lizenz)
+- [🖥️ Screenshots](#-Screenshots)
+- [❗ Hinweis](#-Hinweis)
 
 ---
 
@@ -214,17 +216,17 @@ Frei zur Nutzung, Änderung und Weiterverbreitung unter Nennung der ursprünglic
 
 ---
 
-**Hinweis:**  
-*Dieses Projekt steht in keiner Verbindung zur Strato AG, AVM oder anderen Dritten. Die Nutzung erfolgt auf eigenes Risiko.*
-
----
-
-## Screenshots
+## 🖥️ Screenshots
 
 | Login-Seite                    | Protokoll-Seite                |
 | ------------------------------ | ------------------------------ |
 | ![login](images/frontend/login.png) | ![config](images/frontend/log.png) |
 | Konfigurations-Seite           | Update-Seite                   |
 | ![config](images/frontend/config_1.png) ![config](images/frontend/config_2.png) | ![config](images/frontend/update.png) |
+
+---
+
+## ❗ Hinweis  
+*Dieses Projekt steht in keiner Verbindung zur Strato AG, AVM oder anderen Dritten. Die Nutzung erfolgt auf eigenes Risiko.*
 
 ---
