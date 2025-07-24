@@ -37,7 +37,7 @@ cat > "$APP_DIR/templates/update.html" <<'EOF_HTML'
             </li>
             {% endfor %}
           </ul>
-          <a href="/config" class="btn btn-secondary mt-3">Zurück zur Konfiguration</a>
+          <a href="/config" class="btn btn-primary">Zurück zur Konfiguration</a>
         </div>
       </div>
     </div>
