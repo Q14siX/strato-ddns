@@ -261,6 +261,8 @@ def config_page():
 def testmail():
     config = load_config()
     ms = get_mail_settings(config)
+
+    # Maildaten temporär überschreiben mit den Formwerten
     ms["enabled"] = True
     ms["recipients"] = request.form.get("mail_recipients", "")
     ms["sender"] = request.form.get("mail_sender", "")
@@ -271,8 +273,14 @@ def testmail():
     ms["smtp_port"] = request.form.get("mail_smtp_port", "")
 
     subject = get_mail_subject(config, "Testnachricht")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    event = "Testmail"
+    trigger = "manuell"
+    entries = [("test.domain", "127.0.0.1", "OK")]
+
+    html_body = build_html_mail(subject, entries, timestamp, event, trigger)
     plain_body = "Testnachricht von Strato DDNS"
-    html_body = build_html_mail(subject, plain_body)
+
     try:
         recipients = [a.strip() for a in ms["recipients"].split(",") if a.strip()]
         if not recipients:
@@ -300,7 +308,9 @@ def testmail():
         server.quit()
         return "OK", 200
     except Exception as e:
-        return str(e), 500
+        import traceback
+        print(traceback.format_exc())  # Optional für Debug
+        return f"Fehler: {str(e)}", 500
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per hour", methods=["POST"], error_message="Zu viele Fehlversuche. Bitte später erneut versuchen.")
