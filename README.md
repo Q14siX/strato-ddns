@@ -155,7 +155,7 @@ http://<DEINE_SERVER_IP>:5000/auto?username=<username>&password=<pass>&myip=<ip6
 ## 🔒 Sicherheitshinweise
 
 - Zugang zum Web-Frontend durch eigenen Login geschützt
-- Zugangsdaten werden lokal gespeichert (empfohlen: Server nicht öffentlich erreichbar machen und/oder Zugriff durch Firewall/VPN begrenzen)
+- Zugangsdaten werden lokal gespeichert (empfohlen: Zugriff durch Firewall/VPN begrenzen)
 - Automatische Sperre nach mehreren Fehlversuchen, Entsperrung per Skript möglich
 - Keine Weitergabe deiner Daten an Dritte (ausgenommen Strato-API)
 
