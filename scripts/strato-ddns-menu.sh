@@ -73,7 +73,7 @@ while true; do
         9)
             echo "🔄 Starte: Deinstallation …"
             sleep 1
-            bash <(wget -qO- "$REPO_URL/strato-ddns-setup.sh")
+            bash <(wget -qO- "$REPO_URL/strato-ddns-deinstall.sh")
             echo
             read -rp "➡️  Drücke [ENTER], um das Menü zu schließen …"
             clear
