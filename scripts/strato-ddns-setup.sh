@@ -60,11 +60,11 @@ run_remote_script "scripts/strato-ddns-service.sh"
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
-echo "✅ Installation abgeschlossen: http://$SERVER_IP:5000"
+echo "✅ Installation abgeschlossen: http://$SERVER_IP"
 echo
 echo "ℹ️ Verwenden Sie in der Fritz!Box eine der folgenden Update-URL´s."
-echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>"
-echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ipaddr>"
-echo "  http://$SERVER_IP:5000/auto?username=<username>&password=<pass>&myip=<ip6addr>"
+echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>"
+echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ipaddr>"
+echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ip6addr>"
 echo
 echo "🆘 Für weitere Informationen nutzen Sie die Hilfe oder das Handbuch Ihrer Fritz!Box."
