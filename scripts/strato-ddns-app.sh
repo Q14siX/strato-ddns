@@ -286,7 +286,8 @@ def testmail():
     ms["smtp_server"] = request.form.get("mail_smtp_server", "")
     ms["smtp_port"] = request.form.get("mail_smtp_port", "")
 
-    timestamp = datetime.now(TIMEZONE)
+    now = datetime.now(TIMEZONE)
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Testmail"
     trigger = "manuell"
     subject = get_mail_subject(config, "Testnachricht")
