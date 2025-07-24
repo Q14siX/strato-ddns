@@ -24,19 +24,6 @@ run_remote_script() {
     source <(wget -qO- "$REPO_URL/$script")
 }
 
-# Deinstallation bei bestehender Installation
-if [ -d "$APP_DIR" ]; then
-  echo "== Strato-DDNS scheint installiert zu sein =="
-  echo "Starte Deinstallation…"
-  systemctl stop strato-ddns || true
-  systemctl disable strato-ddns || true
-  rm -f "$SERVICE_FILE"
-  systemctl daemon-reload
-  rm -rf "$APP_DIR"
-  echo "✅ Deinstallation abgeschlossen."
-  exit 0
-fi
-
 echo "== System-Update & Installation benötigter Pakete =="
 apt-get update
 apt-get install -y \
