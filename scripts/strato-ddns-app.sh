@@ -84,9 +84,11 @@ def build_html_mail(subject, entries, timestamp, event, trigger):
 
     # Timestamp-String direkt umwandeln (und unter demselben Namen behalten)
     try:
-        timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M:%S")
+        # ISO-Format mit Mikrosekunden und Zeitzone parsen
+        dt = datetime.fromisoformat(timestamp)
+        timestamp = dt.strftime("%d.%m.%Y %H:%M:%S")
     except:
-        pass  # falls z. B. schon im richtigen Format
+        pass
     
     html_rows = ""
     for domain, ip, status in entries:
