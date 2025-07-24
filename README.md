@@ -11,13 +11,6 @@
 
 ---
 
-![Login-Seite](images/frontend/login.png)
-![Protokoll](images/frontend/log.png)
-![Konfiguration](images/frontend/config_1.png)(images/frontend/config_2.png)
-![Update](images/frontend/update.png)
-
----
-
 ## 📚 Inhaltsverzeichnis
 
 - [📡 Überblick](#-überblick)
