@@ -85,7 +85,7 @@ bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/
 
 - Das Skript installiert alle Abhängigkeiten, legt das Projektverzeichnis an und fragt dich nach Zugangsdaten für das Web-Frontend.
 - Nach Abschluss erreichst du das Frontend unter:  
-  `http://<DEINE_SERVER_IP>:5000`
+  `http://<DEINE_SERVER_IP>`
 
 ---
 
@@ -96,7 +96,7 @@ bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/
 2. **Browser öffnen:**  
    Web-Interface aufrufen:  
    ```
-   http://<DEINE_SERVER_IP>:5000
+   http://<DEINE_SERVER_IP>
    ```
 3. **Konfiguration:**  
    Trage Strato-Login, zu pflegende Domains und gewünschte Einstellungen ein.
@@ -108,13 +108,13 @@ bash <(wget -qO- https://github.com/Q14siX/strato-ddns/releases/latest/download/
 Trage in deiner Fritz!Box als DynDNS-Anbieter folgende Update-URL ein:
 
 ```
-http://<DEINE_SERVER_IP>:5000/auto?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>
+http://<DEINE_SERVER_IP>/auto?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>
 ```
 oder (nur IPv4/IPv6):
 
 ```
-http://<DEINE_SERVER_IP>:5000/auto?username=<username>&password=<pass>&myip=<ipaddr>
-http://<DEINE_SERVER_IP>:5000/auto?username=<username>&password=<pass>&myip=<ip6addr>
+http://<DEINE_SERVER_IP>/auto?username=<username>&password=<pass>&myip=<ipaddr>
+http://<DEINE_SERVER_IP>/auto?username=<username>&password=<pass>&myip=<ip6addr>
 ```
 
 **Ablauf:**  
