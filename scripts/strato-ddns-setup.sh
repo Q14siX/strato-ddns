@@ -67,24 +67,8 @@ run_remote_script "/templates/default/strato-ddns-config.sh"
 run_remote_script "/templates/default/strato-ddns-login.sh"
 run_remote_script "/templates/default/strato-ddns-update.sh"
 
-# ========== Systemd-Service schreiben ==========
-cat > "$SERVICE_FILE" <<EOF
-[Unit]
-Description=Strato DDNS Webapp
-After=network.target
-
-[Service]
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/python3 app.py
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable --now strato-ddns
+# ========== Systemd-Service einspielen ==========
+run_remote_script "/scripts/strato-ddns-app.sh"
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
