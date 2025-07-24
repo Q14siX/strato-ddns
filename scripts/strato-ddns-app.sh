@@ -394,16 +394,20 @@ def auto():
                     f"https://{username}:{password}@dyndns.strato.com/nic/update",
                     params={'hostname': domain, 'myip': ip}, timeout=10
                 )
-                result = resp.text.strip().split()[0] if resp.status_code == 200 else "error"
+                result_line = resp.text.strip()
+                result = result_line.split()[0] if resp.status_code == 200 else "error"
             except Exception:
                 result = "error"
+                result_line = "error"
 
             if priority.index(result) < priority.index(worst):
                 worst = result
                 worst_ip = ip
 
-            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Update", "automatisch", domain, ip, result)
-            log_text += f"{domain} ({ip}): {result}\n"
+            # Protokolliere die tatsächliche IP-Antwort (falls enthalten)
+            returned_ip = result_line.split()[1] if len(result_line.split()) > 1 else ip
+            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Update", "automatisch", domain, returned_ip, result)
+            log_text += f"{domain} ({returned_ip}): {result}\n"
 
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success") and worst in ("good", "nochg"):
         subject = get_mail_subject(config, "Update erfolgreich")
