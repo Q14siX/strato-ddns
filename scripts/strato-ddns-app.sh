@@ -78,9 +78,6 @@ def get_mail_subject(config, suffix=None):
 
 def build_html_mail(subject, body_text):
     # Automatisch die URL zum Startpunkt (Root der App) ermitteln
-    base_url = request.url_root.rstrip("/")
-    script_root = request.script_root.rstrip("/")
-    link = urljoin(base_url + "/", script_root + "/")
     html = f"""
     <!DOCTYPE html>
     <html lang="de">
@@ -98,7 +95,7 @@ def build_html_mail(subject, body_text):
         <div class="container">
             <h2>{subject}</h2>
             <pre>{body_text}</pre>
-            <div class="footer">Strato DDNS Dienst – <a href="{link}">Verwaltungsoberfläche</a></div>
+            <div class="footer">Strato DDNS Dienst – <a href="https://github.com/Q14siX/strato-ddns">Projektseite auf GitHub</a></div>
         </div>
     </body>
     </html>
