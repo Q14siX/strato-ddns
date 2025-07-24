@@ -13,7 +13,7 @@
 
 ![Login-Seite](images/frontend/login.png)
 ![Protokoll](images/frontend/log.png)
-![Konfiguration](images/frontend/config.png)
+![Konfiguration](images/frontend/config_1.png)(images/frontend/config_2.png)
 ![Update](images/frontend/update.png)
 
 ---
@@ -230,6 +230,6 @@ Frei zur Nutzung, Änderung und Weiterverbreitung unter Nennung der ursprünglic
 
 | Login-Seite                    | Protokoll-Seite                | Konfigurations-Seite           | Update-Seite                   |
 | ------------------------------ | ------------------------------ | ------------------------------ | ------------------------------ |
-| ![login](images/frontend/login.png) | ![config](images/frontend/log.png) | ![config](images/frontend/config.png) | ![config](images/frontend/update.png) |
+| ![login](images/frontend/login.png) | ![config](images/frontend/log.png) | ![config](images/frontend/config_1.png) ![config](images/frontend/config_2.png) | ![config](images/frontend/update.png) |
 
 ---
