@@ -86,7 +86,7 @@ def build_html_mail(subject, entries, timestamp, event, trigger):
     try:
         # ISO-Format mit Mikrosekunden und Zeitzone parsen
         dt = datetime.fromisoformat(timestamp)
-        timestamp = dt.strftime("%d.%m.%Y %H:%M:%S")
+        timestamp = dt.strftime("%d.%m.%Y %H:%M.%S") + "Uhr"
     except:
         pass
     
