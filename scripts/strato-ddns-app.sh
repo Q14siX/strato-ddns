@@ -76,8 +76,18 @@ def get_mail_subject(config, suffix=None):
         return f"{subject} – {suffix}"
     return subject
 
-def build_html_mail(subject, body_text):
-    # Automatisch die URL zum Startpunkt (Root der App) ermitteln
+def build_html_mail(subject, entries, timestamp, event, trigger):
+    html_rows = ""
+    for domain, ip, status in entries:
+        color = "#198754" if status.lower().startswith(("good", "nochg")) else "#dc3545"
+        html_rows += f"""
+            <tr>
+                <td>{domain}</td>
+                <td>{ip}</td>
+                <td style="color:{color}; font-weight:bold;">{status}</td>
+            </tr>
+        """
+
     html = f"""
     <!DOCTYPE html>
     <html lang="de">
@@ -85,16 +95,32 @@ def build_html_mail(subject, body_text):
         <meta charset="UTF-8">
         <style>
             body {{ font-family: Arial, sans-serif; background-color: #f8f9fa; color: #212529; }}
-            .container {{ max-width: 600px; margin: 20px auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+            .container {{ max-width: 700px; margin: 20px auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
             h2 {{ color: #0d6efd; }}
-            pre {{ background: #f1f1f1; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
+            th {{ background-color: #e9ecef; }}
             .footer {{ font-size: small; color: gray; margin-top: 32px; }}
         </style>
     </head>
     <body>
         <div class="container">
             <h2>{subject}</h2>
-            <pre>{body_text}</pre>
+            <p><strong>Datum:</strong> {timestamp}<br>
+               <strong>Ereignis:</strong> {event}<br>
+               <strong>Trigger:</strong> {trigger}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>IP-Adresse</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {html_rows}
+                </tbody>
+            </table>
             <div class="footer">Strato DDNS Dienst – <a href="https://github.com/Q14siX/strato-ddns">Projektseite auf GitHub</a></div>
         </div>
     </body>
@@ -308,9 +334,10 @@ def update():
     hostnames = config.get("domains", [])
     results = []
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    event = "Update"
+    trigger = "manuell"
     mail_settings = get_mail_settings(config)
     mail_needed = mail_settings.get("enabled") and mail_settings.get("notify_on_success")
-    mail_body = f"Update am {now}\n\n"
 
     for domain in hostnames:
         try:
@@ -318,17 +345,17 @@ def update():
                 f"https://{username}:{password}@dyndns.strato.com/nic/update",
                 params={'hostname': domain, 'myip': ip}, timeout=10
             )
-            text = resp.text.strip() if resp.status_code == 200 else f"error {resp.status_code}"
+            text_raw = resp.text.strip() if resp.status_code == 200 else f"error {resp.status_code}"
+            text = text_raw.split(" ")[0]
         except Exception as e:
-            text = f"error {e}"
-        results.append((domain, text))
-        log_entry(now, "Update", "manuell", domain, ip, text)
-        mail_body += f"{domain}: {text}\n"
+            text = "error"
+        results.append((domain, ip, text))
+        log_entry(now, event, trigger, domain, ip, text)
 
     if mail_needed:
-        subject = get_mail_subject(config, "Update erfolgreich")
-        html_body = build_html_mail(subject, mail_body)
-        send_mail(config, subject, mail_body)
+        subject = get_mail_subject(config, f"{event} erfolgreich")
+        html_body = build_html_mail(subject, results, now, event, trigger)
+        send_mail(config, subject, html_body)
 
     return render_template('update.html', ip=ip, results=results)
 
@@ -341,48 +368,54 @@ def auto():
     ip_list = [i.strip() for i in req_ip.split(',')] if req_ip else [get_public_ip()]
     client_ip = request.remote_addr
     now = datetime.now()
-    failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto[client_ip] if now - t < timedelta(hours=1)]
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+    event = "Auto-Update"
+    trigger = "automatisch"
     mail_settings = get_mail_settings(config)
+    hostnames = config.get("domains", [])
+    results = []
 
-    # Abuse (5 Fehlversuche)
+    # Missbrauchsschutz (5 Fehlversuche)
+    failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto[client_ip] if now - t < timedelta(hours=1)]
     if len(failed_attempts_auto[client_ip]) >= 5:
-        for domain in config.get("domains", []):
-            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Sperre", "automatisch", domain, ",".join(ip_list), "abuse")
+        for domain in hostnames:
+            log_entry(timestamp, "Sperre", trigger, domain, ",".join(ip_list), "abuse")
+            results.append((domain, ",".join(ip_list), "abuse"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_abuse"):
             subject = get_mail_subject(config, "Sperre durch Missbrauchsversuche")
-            html_body = build_html_mail(subject, f"Abuse durch IP {client_ip}\nIPs: {', '.join(ip_list)}")
-            send_mail(config, subject, f"Abuse durch IP {client_ip}\nIPs: {', '.join(ip_list)}")
+            html_body = build_html_mail(subject, results, timestamp, "Sperre", trigger)
+            send_mail(config, subject, html_body)
         return Response(f"abuse {ip_list[0]}", mimetype='text/plain')
 
     # Keine IP verfügbar
     if not ip_list or not ip_list[0]:
-        for domain in config.get("domains", []):
-            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Update", "automatisch", domain, "keine IP", "noip")
+        for domain in hostnames:
+            log_entry(timestamp, event, trigger, domain, "keine IP", "noip")
+            results.append((domain, "keine IP", "noip"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_noip"):
             subject = get_mail_subject(config, "Keine IP verfügbar")
-            html_body = build_html_mail(subject, f"Von: {client_ip}\nDomains: {', '.join(config.get('domains', []))}")
-            send_mail(config, subject, f"Von: {client_ip}\nDomains: {', '.join(config.get('domains', []))}")
+            html_body = build_html_mail(subject, results, timestamp, event, trigger)
+            send_mail(config, subject, html_body)
         return Response("noip", mimetype="text/plain")
 
-    # Web-Frontend Auth (badauth)
-    if not(req_user == config.get("webuser") and req_pass == config.get("webpass")):
+    # Web-Login fehlgeschlagen
+    if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
-        for domain in config.get("domains", []):
-            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Login fehlgeschlagen", "automatisch", domain, ",".join(ip_list), "badauth-web")
+        for domain in hostnames:
+            log_entry(timestamp, "Login fehlgeschlagen", trigger, domain, ",".join(ip_list), "badauth-web")
+            results.append((domain, ",".join(ip_list), "badauth-web"))
         if mail_settings.get("enabled") and mail_settings.get("notify_on_badauth"):
             subject = get_mail_subject(config, "Login fehlgeschlagen (Web)")
-            html_body = build_html_mail(subject, f"Von: {client_ip}\nIPs: {', '.join(ip_list)}")
-            send_mail(config, subject, f"Von: {client_ip}\nIPs: {', '.join(ip_list)}")
+            html_body = build_html_mail(subject, results, timestamp, "Login fehlgeschlagen", trigger)
+            send_mail(config, subject, html_body)
         return Response(f"badauth {ip_list[0]}", mimetype='text/plain')
 
-    # Strato Auth (Klartext)
+    # Strato-Update
     username = config.get("username", "")
     password = config.get("password", "")
-    hostnames = config.get("domains", [])
+    priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "good", "nochg"]
     worst = "nochg"
     worst_ip = ip_list[0]
-    priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "good", "nochg"]
-    log_text = f"Automatisches Update am {now.strftime('%d.%m.%Y %H:%M:%S')}\n\n"
 
     for domain in hostnames:
         for ip in ip_list:
@@ -392,24 +425,24 @@ def auto():
                     params={'hostname': domain, 'myip': ip}, timeout=10
                 )
                 result_line = resp.text.strip()
-                result = result_line.split()[0] if resp.status_code == 200 else "error"
+                status = result_line.split()[0] if resp.status_code == 200 else "error"
             except Exception:
-                result = "error"
                 result_line = "error"
+                status = "error"
 
-            if priority.index(result) < priority.index(worst):
-                worst = result
+            if priority.index(status) < priority.index(worst):
+                worst = status
                 worst_ip = ip
 
-            # Protokolliere die tatsächliche IP-Antwort (falls enthalten)
             returned_ip = result_line.split()[1] if len(result_line.split()) > 1 else ip
-            log_entry(now.strftime("%Y-%m-%d %H:%M:%S"), "Update", "automatisch", domain, returned_ip, result)
-            log_text += f"{domain} ({returned_ip}): {result}\n"
+            log_entry(timestamp, event, trigger, domain, returned_ip, status)
+            results.append((domain, returned_ip, status))
 
+    # Mail bei Erfolg
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, "Update erfolgreich")
-        html_body = build_html_mail(subject, log_text)
-        send_mail(config, subject, log_text)
+        html_body = build_html_mail(subject, results, timestamp, event, trigger)
+        send_mail(config, subject, html_body)
 
     return Response(f"{worst} {worst_ip}", mimetype='text/plain')
 
