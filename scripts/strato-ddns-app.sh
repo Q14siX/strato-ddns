@@ -16,6 +16,11 @@ from cryptography.fernet import Fernet
 import base64
 import hashlib
 
+# Für Excel-Export
+import xml.etree.ElementTree as ET
+import tempfile
+import openpyxl
+
 TIMEZONE = ZoneInfo("Europe/Berlin")
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'templates')
@@ -29,12 +34,36 @@ def save_config(config):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=4)
 
+def get_log_retention_hours():
+    config = load_config()
+    return int(config.get("log_retention_hours", 24))
+
+def prune_old_logs(root, retention_hours):
+    now = datetime.now(TIMEZONE)
+    to_remove = []
+    for entry in root.findall('entry'):
+        t = entry.findtext("timestamp") or ""
+        try:
+            # Erlaubt beide Formate
+            if "-" in t:  # z.B. 2024-07-25 13:12:14
+                dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+            else:         # z.B. 25.07.2024 13:12:14
+                dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
+        except Exception:
+            continue
+        if (now - dt) > timedelta(hours=retention_hours):
+            to_remove.append(entry)
+    for entry in to_remove:
+        root.remove(entry)
+
 def log_entry(timestamp, event, trigger, domain, ip, status):
     try:
         from xml.etree.ElementTree import Element, SubElement, ElementTree, parse
+        retention_hours = get_log_retention_hours()
         if os.path.exists(LOG_FILE):
             tree = parse(LOG_FILE)
             root = tree.getroot()
+            prune_old_logs(root, retention_hours)
         else:
             root = Element('log')
             tree = ElementTree(root)
@@ -204,7 +233,6 @@ def handle_ratelimit(e):
 @login_required
 def log_page():
     entries = []
-    import xml.etree.ElementTree as ET
     if os.path.exists(LOG_FILE):
         tree = ET.parse(LOG_FILE)
         root = tree.getroot()
@@ -218,18 +246,80 @@ def log_page():
                 "status": entry.findtext("status")
             })
     entries.sort(key=lambda x: x["datetime"], reverse=True)
-    return render_template("log.html", log_entries=entries)
+    config = load_config()
+    log_retention_hours = int(config.get("log_retention_hours", 24))
+    return render_template("log.html", log_entries=entries, log_retention_hours=log_retention_hours)
+
+@app.route('/log/download_excel', methods=['GET'])
+@login_required
+def download_log_excel():
+    # Lade Log und filtere nach Aufbewahrungszeit
+    entries = []
+    if os.path.exists(LOG_FILE):
+        tree = ET.parse(LOG_FILE)
+        root = tree.getroot()
+        retention_hours = get_log_retention_hours()
+        now = datetime.now(TIMEZONE)
+        for entry in root.findall('entry'):
+            t = entry.findtext("timestamp") or ""
+            try:
+                if "-" in t:
+                    dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+                else:
+                    dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
+            except Exception:
+                continue
+            if (now - dt) <= timedelta(hours=retention_hours):
+                entries.append({
+                    "timestamp": t,
+                    "event": entry.findtext("event"),
+                    "trigger": entry.findtext("trigger"),
+                    "domain": entry.findtext("domain"),
+                    "ip": entry.findtext("ip"),
+                    "status": entry.findtext("status")
+                })
+    # Excel erzeugen
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Protokoll"
+    ws.append(["Datum", "Uhrzeit", "Auslösung", "Domain", "IP-Adresse(n)", "Status"])
+    for e in entries:
+        # Zerlege Zeitstempel in Datum/Uhrzeit
+        dt = e["timestamp"]
+        if "-" in dt:
+            try:
+                dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                datum = dt_obj.strftime("%d.%m.%Y")
+                uhrzeit = dt_obj.strftime("%H:%M:%S")
+            except Exception:
+                datum = dt
+                uhrzeit = ""
+        else:
+            try:
+                dt_obj = datetime.strptime(dt, "%d.%m.%Y %H:%M:%S")
+                datum = dt_obj.strftime("%d.%m.%Y")
+                uhrzeit = dt_obj.strftime("%H:%M:%S")
+            except Exception:
+                datum = dt
+                uhrzeit = ""
+        ws.append([datum, uhrzeit, e["trigger"], e["domain"], e["ip"], e["status"]])
+    tmp = BytesIO()
+    wb.save(tmp)
+    tmp.seek(0)
+    return send_file(tmp, as_attachment=True, download_name="strato_ddns_log.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.route('/config')
 @login_required
 def config_page():
     config = load_config()
+    log_retention_hours = int(config.get("log_retention_hours", 24))
     return render_template(
         'config.html',
         username=config.get("username", ""),
         password=config.get("password", ""),
         domains="\n".join(config.get("domains", [])),
         mail_settings=get_mail_settings(config),
+        log_retention_hours=log_retention_hours,
         msg=request.args.get("msg", ""),
         error=request.args.get("error", "")
     )
@@ -281,6 +371,20 @@ def save_access():
     config["webpass"] = new_pass
     save_config(config)
     return jsonify(success=True, msg="Zugangsdaten wurden gespeichert.")
+
+@app.route('/config/save_log_settings', methods=['POST'])
+@login_required
+def save_log_settings():
+    config = load_config()
+    try:
+        hours = int(request.form.get("log_retention_hours", 24))
+        if hours < 1:
+            return jsonify(success=False, msg="Mindestwert: 1 Stunde")
+    except:
+        return jsonify(success=False, msg="Ungültige Eingabe!")
+    config["log_retention_hours"] = hours
+    save_config(config)
+    return jsonify(success=True, msg="Protokoll-Aufbewahrungszeit gespeichert.")
 
 # --- Sicherung & Wiederherstellung ---
 def derive_key(password: str) -> bytes:
