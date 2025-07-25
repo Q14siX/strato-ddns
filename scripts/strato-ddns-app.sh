@@ -326,6 +326,16 @@ def download_log_excel():
     tmp.seek(0)
     return send_file(tmp, as_attachment=True, download_name="strato_ddns_log.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+@app.route('/log/clear', methods=['POST'])
+@login_required
+def clear_log():
+    try:
+        if os.path.exists(LOG_FILE):
+            os.remove(LOG_FILE)
+        return jsonify(success=True, msg="Das Protokoll wurde gelöscht.")
+    except Exception as e:
+        return jsonify(success=False, msg="Fehler beim Löschen: " + str(e))
+
 @app.route('/config')
 @login_required
 def config_page():
