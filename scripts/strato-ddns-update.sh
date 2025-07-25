@@ -33,7 +33,7 @@ run_remote_script() {
 }
 
 echo "== System-Update & Installation benötigter Pakete =="
-apt-get update
+apt-get update && apt-get upgrade
 apt-get install -y \
   python3 \
   python3-pip \
@@ -48,7 +48,7 @@ apt-get install -y \
 echo "== Python-Abhängigkeiten (pip) installieren =="
 pip3 install --upgrade pip
 
-pip3 install --break-system-packages openpyxl
+pip3 install openpyxl
 
 rm -rf "$APP_DIR/templates"
 mkdir -p "$APP_DIR/templates"
