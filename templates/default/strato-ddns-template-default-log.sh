@@ -25,7 +25,11 @@ cat > "$APP_DIR/templates/log.html" <<'EOF_HTML'
         <li class="nav-item"><a class="nav-link active" href="/log">Protokoll</a></li>
         <li class="nav-item"><a class="nav-link" href="/config">Konfiguration</a></li>
       </ul>
-      <span class="navbar-text"><a href="/logout" class="btn btn-outline-light btn-sm">Logout</a></span>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/logout">Logout</a>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>
