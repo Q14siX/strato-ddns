@@ -1,326 +1,475 @@
-#!/bin/bash
-cat > "$APP_DIR/app.py" <<'EOF_PY'
-from flask import Flask, render_template, request, redirect, url_for, session, Response, send_file, jsonify
-import requests, json, os, smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from flask_limiter.errors import RateLimitExceeded
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from collections import defaultdict
-from urllib.parse import urljoin
-from io import BytesIO
-from cryptography.fernet import Fernet
+# -*- coding: utf-8 -*-
+
 import base64
 import hashlib
+import json
+import os
+import smtplib
+from collections import defaultdict
+from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from functools import wraps
+from io import BytesIO
+from zoneinfo import ZoneInfo
 
-# Für Excel-Export
-import xml.etree.ElementTree as ET
-import tempfile
 import openpyxl
+import requests
+from cryptography.fernet import Fernet
+from flask import (Flask, Response, flash, jsonify, redirect,
+                   render_template, request, send_file, session, url_for)
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
+import xml.etree.ElementTree as ET
 
+# --- Konstanten und Konfiguration ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
+TEMPLATES_DIR = os.path.join(BASE_DIR, 'templates')
+LOG_FILE = os.path.join(BASE_DIR, 'log.xml')
 TIMEZONE = ZoneInfo("Europe/Berlin")
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
-TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'templates')
-LOG_FILE = os.path.join(os.path.dirname(__file__), 'log.xml')
+
+# --- Flask App Initialisierung ---
+app = Flask(__name__, template_folder=TEMPLATES_DIR)
+limiter = Limiter(key_func=get_remote_address, storage_uri="memory://", app=app)
+failed_attempts_auto = defaultdict(list)
+
+
+# --- Hilfsfunktionen ---
 
 def load_config():
-    with open(CONFIG_FILE) as f:
-        return json.load(f)
+    """Lädt die Konfigurationsdatei sicher."""
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 def save_config(config):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=4)
+    """Speichert die Konfiguration im JSON-Format."""
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
 
 def get_log_retention_hours():
+    """Holt die Aufbewahrungsdauer für Logs aus der Konfiguration."""
     config = load_config()
     return int(config.get("log_retention_hours", 24))
 
+def get_public_ip():
+    """Ermittelt die öffentliche IP-Adresse."""
+    try:
+        response = requests.get("https://api.ipify.org", timeout=5)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException:
+        return None
+
+def derive_key(password: str) -> bytes:
+    """Leitet einen sicheren kryptographischen Schlüssel von einem Passwort ab."""
+    return base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
+
+
+# --- Logging ---
+
 def prune_old_logs(root, retention_hours):
+    """Entfernt veraltete Log-Einträge."""
     now = datetime.now(TIMEZONE)
+    cutoff = now - timedelta(hours=retention_hours)
     to_remove = []
     for entry in root.findall('entry'):
         t = entry.findtext("timestamp") or ""
         try:
-            if "-" in t:
-                dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
-            else:
-                dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
-            dt = dt.replace(tzinfo=TIMEZONE)
-        except Exception:
+            dt_format = "%Y-%m-%d %H:%M:%S" if "-" in t else "%d.%m.%Y %H:%M:%S"
+            dt = datetime.strptime(t, dt_format).replace(tzinfo=TIMEZONE)
+            if dt < cutoff:
+                to_remove.append(entry)
+        except ValueError:
             continue
-        if (now - dt) > timedelta(hours=retention_hours):
-            to_remove.append(entry)
     for entry in to_remove:
         root.remove(entry)
 
-def append_log_entries(new_entries, retention_hours):
-    from xml.etree.ElementTree import Element, SubElement, ElementTree, parse
-    now = datetime.now(TIMEZONE)
-    if os.path.exists(LOG_FILE):
-        tree = parse(LOG_FILE)
-        root = tree.getroot()
-        prune_old_logs(root, retention_hours)
-    else:
-        root = Element('log')
-        tree = ElementTree(root)
-    for timestamp, event, trigger, domain, ip, status in new_entries:
-        entry = ET.SubElement(root, 'entry')
-        ET.SubElement(entry, 'timestamp').text = timestamp
-        ET.SubElement(entry, 'event').text = event
-        ET.SubElement(entry, 'trigger').text = trigger
-        ET.SubElement(entry, 'domain').text = domain
-        ET.SubElement(entry, 'ip').text = ip
-        ET.SubElement(entry, 'status').text = status
-    tree.write(LOG_FILE, encoding='utf-8', xml_declaration=True)
-
-def log_entry(timestamp, event, trigger, domain, ip, status):
+def append_log_entries(new_entries):
+    """Fügt neue Einträge zum Log hinzu."""
+    retention_hours = get_log_retention_hours()
     try:
-        from xml.etree.ElementTree import Element, SubElement, ElementTree, parse
-        retention_hours = get_log_retention_hours()
         if os.path.exists(LOG_FILE):
-            tree = parse(LOG_FILE)
+            tree = ET.parse(LOG_FILE)
             root = tree.getroot()
-            prune_old_logs(root, retention_hours)
         else:
-            root = Element('log')
-            tree = ElementTree(root)
-        entry = SubElement(root, 'entry')
-        SubElement(entry, 'timestamp').text = timestamp
-        SubElement(entry, 'event').text = event
-        SubElement(entry, 'trigger').text = trigger
-        SubElement(entry, 'domain').text = domain
-        SubElement(entry, 'ip').text = ip
-        SubElement(entry, 'status').text = status
-        tree.write(LOG_FILE, encoding='utf-8', xml_declaration=True)
-    except Exception as e:
-        print("Log error:", e)
+            root = ET.Element('log')
+            tree = ET.ElementTree(root)
 
-def get_public_ip():
-    try:
-        return requests.get("https://api.ipify.org").text
-    except:
-        return None
+        prune_old_logs(root, retention_hours)
+
+        for timestamp, event, trigger, domain, ip, status in new_entries:
+            entry = ET.SubElement(root, 'entry')
+            ET.SubElement(entry, 'timestamp').text = timestamp
+            ET.SubElement(entry, 'event').text = event
+            ET.SubElement(entry, 'trigger').text = trigger
+            ET.SubElement(entry, 'domain').text = domain
+            ET.SubElement(entry, 'ip').text = ip
+            ET.SubElement(entry, 'status').text = status
+
+        tree.write(LOG_FILE, encoding='utf-8', xml_declaration=True)
+    except (ET.ParseError, IOError) as e:
+        print(f"Fehler beim Schreiben der Log-Datei: {e}")
+
+
+# --- Mail-Funktionen ---
 
 def get_mail_settings(config):
+    """Holt Mail-Einstellungen mit Standardwerten."""
     ms = config.get("mail_settings", {})
-    default = {
-        "enabled": False,
-        "recipients": "",
-        "sender": "",
-        "subject": "Strato DDNS",
-        "smtp_user": "",
-        "smtp_pass": "",
-        "smtp_server": "",
-        "smtp_port": "",
-        "notify_on_success": False,
-        "notify_on_badauth": True,
-        "notify_on_noip": True,
-        "notify_on_abuse": True,
+    defaults = {
+        "enabled": False, "recipients": "", "sender": "", "subject": "Strato DDNS",
+        "smtp_user": "", "smtp_pass": "", "smtp_server": "", "smtp_port": 587,
+        "notify_on_success": False, "notify_on_badauth": True,
+        "notify_on_noip": True, "notify_on_abuse": True,
     }
-    for k in default:
-        ms.setdefault(k, default[k])
-    return ms
-
-def get_mail_subject(config, suffix=None):
-    ms = get_mail_settings(config)
-    subject = ms.get("subject") or "Strato DDNS"
-    if suffix:
-        return f"{subject} – {suffix}"
-    return subject
+    defaults.update(ms)
+    return defaults
 
 def build_html_mail(subject, entries, timestamp, event, trigger):
-    from datetime import datetime
+    """Erstellt eine HTML-Mail."""
     try:
         dt = datetime.fromisoformat(timestamp)
-        timestamp = dt.strftime("%d.%m.%Y - %H:%M:%S") + " Uhr"
-    except:
-        pass
+        timestamp_str = dt.strftime("%d.%m.%Y - %H:%M:%S") + " Uhr"
+    except (ValueError, TypeError):
+        timestamp_str = str(timestamp)
 
-    html_rows = ""
+    rows = ""
     for domain, ip, status in entries:
-        color = "#198754" if status.lower().startswith(("good", "nochg")) else "#dc3545"
-        html_rows += f"""
-            <tr>
-                <td>{domain}</td>
-                <td>{ip}</td>
-                <td style="color:{color}; font-weight:bold;">{status}</td>
-            </tr>
-        """
+        color = "#16a34a" if status.lower().startswith(("good", "nochg")) else "#dc2626"
+        rows += f'<tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{domain}</td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{ip}</td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color:{color}; font-weight:bold;">{status}</td></tr>'
 
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {{ font-family: Arial, sans-serif; background-color: #f8f9fa; color: #212529; }}
-            .container {{ max-width: 700px; margin: 20px auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-            h2 {{ color: #0d6efd; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
-            th {{ background-color: #e9ecef; }}
-            .footer {{ font-size: small; color: gray; margin-top: 32px; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>{subject}</h2>
-            <p><strong>Datum:</strong> {timestamp}<br>
-               <strong>Ereignis:</strong> {event}<br>
-               <strong>Trigger:</strong> {trigger}</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Domain</th>
-                        <th>IP-Adresse</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {html_rows}
-                </tbody>
-            </table>
-            <div class="footer">Strato DDNS Dienst – <a href="https://github.com/Q14siX/strato-ddns">Projektseite auf GitHub</a></div>
-        </div>
-    </body>
-    </html>
+    return f"""
+    <!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><style>body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f3f4f6;color:#1f2937;margin:0;padding:20px;}} .container{{max-width:600px;margin:auto;background:white;padding:24px;border-radius:8px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);}} h2{{color:#0078d4;}} table{{width:100%;border-collapse:collapse;margin-top:20px;}} .footer{{font-size:12px;color:#6b7280;margin-top:24px;text-align:center;}}</style></head><body><div class="container"><h2>{subject}</h2><p><strong>Datum:</strong> {timestamp_str}<br><strong>Ereignis:</strong> {event}<br><strong>Auslöser:</strong> {trigger}</p><table><thead><tr><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">Domain</th><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">IP-Adresse</th><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">Status</th></tr></thead><tbody>{rows}</tbody></table><div class="footer">Strato DDNS Dienst</div></div></body></html>
     """
-    return html
 
-def send_mail(config, subject, entries, timestamp, event, trigger, decrypt_pw=None):
+def send_mail(config, subject, entries, timestamp, event, trigger):
+    """Versendet eine E-Mail."""
     ms = get_mail_settings(config)
-    if not ms["enabled"]:
-        return False, "Mailversand deaktiviert"
+    if not ms.get("enabled"):
+        return False, "Mailversand ist deaktiviert."
+
+    recipients = [r.strip() for r in ms.get("recipients", "").split(",") if r.strip()]
+    if not recipients:
+        return False, "Keine Empfänger konfiguriert."
+
     try:
-        recipients = [a.strip() for a in ms["recipients"].split(",") if a.strip()]
-        if not recipients:
-            return False, "Keine Empfänger angegeben"
-
-        html_body = build_html_mail(subject, entries, timestamp, event, trigger)
-        plain_body = "\n".join(f"{d}: {ip} – {status}" for d, ip, status in entries)
-
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = ms["sender"]
         msg["To"] = ", ".join(recipients)
+        
+        html_body = build_html_mail(subject, entries, timestamp, event, trigger)
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-        part_text = MIMEText(plain_body, "plain", "utf-8")
-        part_html = MIMEText(html_body, "html", "utf-8")
-
-        msg.attach(part_text)
-        msg.attach(part_html)
-
-        smtp_user = ms["smtp_user"]
-        smtp_pass = ms["smtp_pass"]
-        smtp_server = ms["smtp_server"]
-        smtp_port = int(ms["smtp_port"]) if str(ms["smtp_port"]).isdigit() else 587
-
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        if smtp_user and smtp_pass:
-            server.login(smtp_user, smtp_pass)
-        server.sendmail(ms["sender"], recipients, msg.as_string())
-        server.quit()
-        return True, "OK"
+        smtp_port = int(ms.get("smtp_port", 587))
+        with smtplib.SMTP(ms["smtp_server"], smtp_port, timeout=10) as server:
+            server.starttls()
+            if ms.get("smtp_user") and ms.get("smtp_pass"):
+                server.login(ms["smtp_user"], ms["smtp_pass"])
+            server.sendmail(ms["sender"], recipients, msg.as_string())
+        return True, "Mail erfolgreich versendet."
     except Exception as e:
-        return False, str(e)
+        return False, f"Mail-Fehler: {e}"
 
-app = Flask(__name__, template_folder=TEMPLATES_DIR)
-app.secret_key = load_config()["secret_key"]
-limiter = Limiter(app=app, key_func=get_remote_address, storage_uri="memory://")
-failed_attempts_auto = defaultdict(list)
+
+# --- Decorators & Hooks ---
 
 def login_required(f):
-    from functools import wraps
     @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('logged_in'):
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
-    return decorated
+    return decorated_function
+
+@app.before_request
+def setup_session():
+    config = load_config()
+    app.secret_key = config.get("secret_key", os.urandom(24))
 
 @app.errorhandler(RateLimitExceeded)
 def handle_ratelimit(e):
-    if request.endpoint == "login":
-        return render_template("login.html", error=str(e.description), disabled=True), 429
-    return "Too Many Requests", 429
+    flash(f"Zu viele Versuche. Limit: {e.description}", "danger")
+    return render_template("login.html", disabled=True), 429
+
+@app.errorhandler(404)
+def not_found(e):
+    if 'logged_in' in session:
+        return redirect(url_for('log_page'))
+    return redirect(url_for('login'))
+
+
+# --- Hauptrouten ---
 
 @app.route('/')
+@login_required
+def index():
+    return redirect(url_for('log_page'))
+
+@app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per hour", methods=["POST"], error_message="Zu viele Login-Versuche.")
+def login():
+    if request.method == 'POST':
+        config = load_config()
+        user = request.form.get('username')
+        pw = request.form.get('password')
+        if user == config.get("webuser") and pw == config.get("webpass"):
+            session['logged_in'] = True
+            return redirect(url_for('log_page'))
+        else:
+            flash("Falsche Zugangsdaten.", "danger")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
 @app.route('/log')
 @login_required
 def log_page():
     entries = []
     if os.path.exists(LOG_FILE):
-        tree = ET.parse(LOG_FILE)
-        root = tree.getroot()
-        for entry in root.findall('entry'):
-            entries.append({
-                "datetime": entry.findtext("timestamp"),
-                "event": entry.findtext("event"),
-                "trigger": entry.findtext("trigger"),
-                "domain": entry.findtext("domain"),
-                "ip": entry.findtext("ip"),
-                "status": entry.findtext("status")
-            })
-    entries.sort(key=lambda x: x["datetime"], reverse=True)
-    config = load_config()
-    log_retention_hours = int(config.get("log_retention_hours", 24))
-    return render_template("log.html", log_entries=entries, log_retention_hours=log_retention_hours)
+        try:
+            tree = ET.parse(LOG_FILE)
+            root = tree.getroot()
+            for entry in root.findall('entry'):
+                entries.append({
+                    "datetime": entry.findtext("timestamp", "N/A"),
+                    "trigger": entry.findtext("trigger", "N/A"),
+                    "domain": entry.findtext("domain", "N/A"),
+                    "ip": entry.findtext("ip", "N/A"),
+                    "status": entry.findtext("status", "N/A")
+                })
+            entries.sort(key=lambda x: x["datetime"], reverse=True)
+        except ET.ParseError:
+            flash("Fehler beim Lesen der Log-Datei.", "danger")
+    return render_template("log.html", log_entries=entries, pagename="log")
 
-@app.route('/log/download_excel', methods=['GET'])
+@app.route('/config')
+@login_required
+def config_page():
+    config = load_config()
+    return render_template(
+        'config.html',
+        username=config.get("username", ""),
+        password=config.get("password", ""),
+        domains="\n".join(config.get("domains", [])),
+        mail_settings=get_mail_settings(config),
+        log_retention_hours=config.get("log_retention_hours", 24),
+        pagename="config"
+    )
+
+@app.route('/webupdate')
+@login_required
+def webupdate_page():
+    config = load_config()
+    username = config.get("username", "")
+    password = config.get("password", "")
+    ip = get_public_ip()
+    hostnames = config.get("domains", [])
+    results = []
+    new_log_entries = []
+    now = datetime.now(TIMEZONE)
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+    event = "Manuelles Update"
+    trigger = "manuell"
+
+    if not ip:
+        flash("Konnte öffentliche IP nicht ermitteln.", "danger")
+        return redirect(url_for('config_page'))
+
+    for domain in hostnames:
+        try:
+            resp = requests.get(
+                f"https://{username}:{password}@dyndns.strato.com/nic/update",
+                params={'hostname': domain, 'myip': ip}, timeout=10
+            )
+            text_raw = resp.text.strip() if resp.status_code == 200 else f"error {resp.status_code}"
+            status, returned_ip = text_raw.split(" ") if " " in text_raw else (text_raw, ip)
+        except requests.RequestException as e:
+            status, returned_ip = "error", str(e)
+        
+        results.append((domain, returned_ip, status))
+        new_log_entries.append((timestamp, event, trigger, domain, returned_ip, status))
+
+    append_log_entries(new_log_entries)
+    
+    ms = get_mail_settings(config)
+    if ms.get("enabled") and ms.get("notify_on_success"):
+        subject = f"{ms.get('subject', 'Strato DDNS')} – {event}"
+        send_mail(config, subject, results, timestamp, event, trigger)
+
+    return render_template('webupdate.html', ip=ip, results=results, pagename="update")
+
+
+# --- API Endpunkte ---
+
+@app.route('/api/save/strato', methods=['POST'])
+@login_required
+def api_save_strato():
+    config = load_config()
+    config["username"] = request.form.get("username", "").strip()
+    config["password"] = request.form.get("password", "")
+    config["domains"] = [d.strip() for d in request.form.get("domains", "").splitlines() if d.strip()]
+    save_config(config)
+    return jsonify(success=True, message="Strato DDNS Einstellungen gespeichert.")
+
+@app.route('/api/save/mail', methods=['POST'])
+@login_required
+def api_save_mail():
+    config = load_config()
+    ms = config.get("mail_settings", {})
+    ms["enabled"] = "mail_enabled" in request.form
+    ms["recipients"] = request.form.get("mail_recipients", "")
+    ms["sender"] = request.form.get("mail_sender", "")
+    ms["subject"] = request.form.get("mail_subject", "")
+    ms["smtp_user"] = request.form.get("mail_smtp_user", "")
+    ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
+    ms["smtp_server"] = request.form.get("mail_smtp_server", "")
+    ms["smtp_port"] = request.form.get("mail_smtp_port", "587")
+    ms["notify_on_success"] = "mail_notify_success" in request.form
+    ms["notify_on_badauth"] = "mail_notify_badauth" in request.form
+    ms["notify_on_noip"] = "mail_notify_noip" in request.form
+    ms["notify_on_abuse"] = "mail_notify_abuse" in request.form
+    config["mail_settings"] = ms
+    save_config(config)
+    return jsonify(success=True, message="Mail-Einstellungen gespeichert.")
+
+@app.route('/api/save/access', methods=['POST'])
+@login_required
+def api_save_access():
+    config = load_config()
+    new_user = request.form.get("new_webuser", "").strip()
+    new_pass = request.form.get("new_webpass", "")
+    if new_pass and new_pass != request.form.get("confirm_webpass", ""):
+        return jsonify(success=False, message="Passwörter stimmen nicht überein!"), 400
+    if new_user:
+        config["webuser"] = new_user
+    if new_pass:
+        config["webpass"] = new_pass
+    save_config(config)
+    return jsonify(success=True, message="Zugangsdaten aktualisiert.")
+
+@app.route('/api/save/log_settings', methods=['POST'])
+@login_required
+def api_save_log_settings():
+    config = load_config()
+    try:
+        hours = int(request.form.get("log_retention_hours", 24))
+        if hours < 1:
+            return jsonify(success=False, message="Aufbewahrungsdauer muss mindestens 1 Stunde betragen."), 400
+        config["log_retention_hours"] = hours
+        save_config(config)
+        return jsonify(success=True, message="Protokoll-Einstellungen gespeichert.")
+    except (ValueError, TypeError):
+        return jsonify(success=False, message="Ungültiger Wert für Stunden."), 400
+
+@app.route('/api/backup/download', methods=['POST'])
+@login_required
+def api_download_backup():
+    pw = request.form.get("backup_password")
+    if not pw:
+        return jsonify(success=False, message="Passwort für die Verschlüsselung erforderlich."), 400
+    
+    key = derive_key(pw)
+    fernet = Fernet(key)
+    try:
+        config_data = json.dumps(load_config(), indent=4).encode('utf-8')
+        encrypted = fernet.encrypt(config_data)
+        return send_file(
+            BytesIO(encrypted),
+            as_attachment=True,
+            download_name=f"strato_ddns_backup_{datetime.now().strftime('%Y%m%d')}.json.enc",
+            mimetype="application/octet-stream"
+        )
+    except Exception as e:
+        return jsonify(success=False, message=f"Fehler bei der Sicherung: {e}"), 500
+
+@app.route('/api/backup/restore', methods=['POST'])
+@login_required
+def api_restore_backup():
+    pw = request.form.get("restore_password")
+    file = request.files.get("restore_file")
+    if not pw or not file:
+        return jsonify(success=False, message="Datei und Passwort sind erforderlich."), 400
+    
+    key = derive_key(pw)
+    fernet = Fernet(key)
+    try:
+        decrypted = fernet.decrypt(file.read())
+        config_data = json.loads(decrypted)
+        save_config(config_data)
+        return jsonify(success=True, message="Konfiguration erfolgreich wiederhergestellt. Die Seite wird neu geladen.")
+    except Exception as e:
+        return jsonify(success=False, message=f"Wiederherstellung fehlgeschlagen: {e}"), 400
+
+@app.route('/api/testmail', methods=['POST'])
+@login_required
+def api_testmail():
+    test_config = {
+        "mail_settings": {
+            "enabled": True,
+            "recipients": request.form.get("mail_recipients"),
+            "sender": request.form.get("mail_sender"),
+            "subject": request.form.get("mail_subject"),
+            "smtp_user": request.form.get("mail_smtp_user"),
+            "smtp_pass": request.form.get("mail_smtp_pass"),
+            "smtp_server": request.form.get("mail_smtp_server"),
+            "smtp_port": request.form.get("mail_smtp_port"),
+        }
+    }
+    now = datetime.now(TIMEZONE)
+    timestamp = now.isoformat()
+    subject = f"{test_config['mail_settings']['subject']} – Testnachricht"
+    entries = [("test.domain.com", "127.0.0.1", "good")]
+    
+    success, info = send_mail(test_config, subject, entries, timestamp, "Test", "manuell")
+    
+    if success:
+        return jsonify(success=True, message=info)
+    else:
+        return jsonify(success=False, message=info), 500
+
+@app.route('/log/download_excel')
 @login_required
 def download_log_excel():
-    entries = []
-    if os.path.exists(LOG_FILE):
-        tree = ET.parse(LOG_FILE)
-        root = tree.getroot()
-        retention_hours = get_log_retention_hours()
-        now = datetime.now(TIMEZONE)
-        for entry in root.findall('entry'):
-            t = entry.findtext("timestamp") or ""
-            try:
-                if "-" in t:
-                    dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
-                else:
-                    dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
-                dt = dt.replace(tzinfo=TIMEZONE)
-            except Exception:
-                continue
-            if (now - dt) <= timedelta(hours=retention_hours):
-                entries.append({
-                    "timestamp": t,
-                    "event": entry.findtext("event"),
-                    "trigger": entry.findtext("trigger"),
-                    "domain": entry.findtext("domain"),
-                    "ip": entry.findtext("ip"),
-                    "status": entry.findtext("status")
-                })
+    if not os.path.exists(LOG_FILE):
+        return "Log-Datei nicht gefunden.", 404
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Protokoll"
     ws.append(["Datum", "Uhrzeit", "Auslösung", "Domain", "IP-Adresse(n)", "Status"])
-    for e in entries:
-        dt = e["timestamp"]
-        if "-" in dt:
-            try:
-                dt_obj = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
-                datum = dt_obj.strftime("%d.%m.%Y")
-                uhrzeit = dt_obj.strftime("%H:%M:%S")
-            except Exception:
-                datum = dt
-                uhrzeit = ""
-        else:
-            try:
-                dt_obj = datetime.strptime(dt, "%d.%m.%Y %H:%M:%S")
-                datum = dt_obj.strftime("%d.%m.%Y")
-                uhrzeit = dt_obj.strftime("%H:%M:%S")
-            except Exception:
-                datum = dt
-                uhrzeit = ""
-        ws.append([datum, uhrzeit, e["trigger"], e["domain"], e["ip"], e["status"]])
+
+    try:
+        tree = ET.parse(LOG_FILE)
+        root = tree.getroot()
+        for entry in root.findall('entry'):
+            dt_str = entry.findtext("timestamp", "")
+            datum, uhrzeit = "N/A", "N/A"
+            if dt_str:
+                try:
+                    dt_obj = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                    datum = dt_obj.strftime("%d.%m.%Y")
+                    uhrzeit = dt_obj.strftime("%H:%M:%S")
+                except ValueError:
+                    datum = dt_str.split(" ")[0] if " " in dt_str else dt_str
+            ws.append([
+                datum, uhrzeit,
+                entry.findtext("trigger", ""),
+                entry.findtext("domain", ""),
+                entry.findtext("ip", ""),
+                entry.findtext("status", "")
+            ])
+    except ET.ParseError:
+        return "Fehler beim Parsen der Log-Datei.", 500
+
     tmp = BytesIO()
     wb.save(tmp)
     tmp.seek(0)
@@ -332,285 +481,96 @@ def clear_log():
     try:
         if os.path.exists(LOG_FILE):
             os.remove(LOG_FILE)
-        return jsonify(success=True, msg="Das Protokoll wurde gelöscht.")
-    except Exception as e:
-        return jsonify(success=False, msg="Fehler beim Löschen: " + str(e))
+        return jsonify(success=True, message="Protokoll wurde erfolgreich gelöscht.")
+    except OSError as e:
+        return jsonify(success=False, message=f"Fehler beim Löschen des Protokolls: {e}"), 500
 
-@app.route('/config')
-@login_required
-def config_page():
-    config = load_config()
-    log_retention_hours = int(config.get("log_retention_hours", 24))
-    return render_template(
-        'config.html',
-        username=config.get("username", ""),
-        password=config.get("password", ""),
-        domains="\n".join(config.get("domains", [])),
-        mail_settings=get_mail_settings(config),
-        log_retention_hours=log_retention_hours,
-        msg=request.args.get("msg", ""),
-        error=request.args.get("error", "")
-    )
-
-@app.route('/config/save_strato', methods=['POST'])
-@login_required
-def save_strato():
-    config = load_config()
-    config["username"] = request.form.get("username", "")
-    config["password"] = request.form.get("password", "")
-    config["domains"] = [d.strip() for d in request.form.get("domains", "").splitlines() if d.strip()]
-    save_config(config)
-    return jsonify(success=True, msg="Strato DDNS Einstellungen gespeichert.")
-
-@app.route('/config/save_mail', methods=['POST'])
-@login_required
-def save_mail():
-    config = load_config()
-    ms = config.get("mail_settings", {})
-    ms["enabled"] = "mail_enabled" in request.form
-    ms["recipients"] = request.form.get("mail_recipients", "")
-    ms["sender"] = request.form.get("mail_sender", "")
-    ms["subject"] = request.form.get("mail_subject", "")
-    ms["smtp_user"] = request.form.get("mail_smtp_user", "")
-    ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
-    ms["smtp_server"] = request.form.get("mail_smtp_server", "")
-    ms["smtp_port"] = request.form.get("mail_smtp_port", "")
-    ms["notify_on_success"] = "mail_notify_success" in request.form
-    ms["notify_on_badauth"] = "mail_notify_badauth" in request.form
-    ms["notify_on_noip"] = "mail_notify_noip" in request.form
-    ms["notify_on_abuse"] = "mail_notify_abuse" in request.form
-    config["mail_settings"] = ms
-    save_config(config)
-    return jsonify(success=True, msg="Mail-Benachrichtigungseinstellungen gespeichert.")
-
-@app.route('/config/save_access', methods=['POST'])
-@login_required
-def save_access():
-    config = load_config()
-    new_user = request.form.get("new_webuser", "").strip()
-    new_pass = request.form.get("new_webpass", "")
-    confirm_pass = request.form.get("confirm_webpass", "")
-    if not (new_user and new_pass and confirm_pass):
-        return jsonify(success=False, msg="Alle Felder ausfüllen!")
-    if new_pass != confirm_pass:
-        return jsonify(success=False, msg="Passwörter stimmen nicht überein!")
-    config["webuser"] = new_user
-    config["webpass"] = new_pass
-    save_config(config)
-    return jsonify(success=True, msg="Zugangsdaten wurden gespeichert.")
-
-@app.route('/config/save_log_settings', methods=['POST'])
-@login_required
-def save_log_settings():
-    config = load_config()
-    try:
-        hours = int(request.form.get("log_retention_hours", 24))
-        if hours < 1:
-            return jsonify(success=False, msg="Mindestwert: 1 Stunde")
-    except:
-        return jsonify(success=False, msg="Ungültige Eingabe!")
-    config["log_retention_hours"] = hours
-    save_config(config)
-    return jsonify(success=True, msg="Protokoll-Aufbewahrungszeit gespeichert.")
-
-def derive_key(password: str) -> bytes:
-    return base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
-
-@app.route('/backup/download', methods=['POST'])
-@login_required
-def download_config():
-    pw = request.form.get("backup_password", "")
-    if not pw:
-        return "Kein Passwort angegeben", 400
-    key = derive_key(pw)
-    fernet = Fernet(key)
-    try:
-        with open(CONFIG_FILE, 'rb') as f:
-            encrypted = fernet.encrypt(f.read())
-        return send_file(
-            BytesIO(encrypted),
-            as_attachment=True,
-            download_name="config.json.enc",
-            mimetype="application/octet-stream"
-        )
-    except Exception as e:
-        return f"Fehler beim Erstellen der Sicherung: {e}", 500
-
-@app.route('/backup/upload', methods=['POST'])
-@login_required
-def upload_config():
-    pw = request.form.get("restore_password", "")
-    file = request.files.get("restore_file")
-    if not pw or not file:
-        return jsonify(success=False, msg="Datei oder Passwort fehlt!")
-    key = derive_key(pw)
-    fernet = Fernet(key)
-    try:
-        decrypted = fernet.decrypt(file.read())
-        with open(CONFIG_FILE, "wb") as f:
-            f.write(decrypted)
-        return jsonify(success=True, msg="Wiederherstellung erfolgreich!")
-    except Exception as e:
-        return jsonify(success=False, msg="Fehler: "+str(e))
-
-@app.route('/testmail', methods=['POST'])
-@login_required
-def testmail():
-    config = load_config()
-    ms = get_mail_settings(config)
-    ms["enabled"] = True
-    ms["recipients"] = request.form.get("mail_recipients", "")
-    ms["sender"] = request.form.get("mail_sender", "")
-    ms["subject"] = request.form.get("mail_subject", "")
-    ms["smtp_user"] = request.form.get("mail_smtp_user", "")
-    ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
-    ms["smtp_server"] = request.form.get("mail_smtp_server", "")
-    ms["smtp_port"] = request.form.get("mail_smtp_port", "")
-    now = datetime.now(TIMEZONE)
-    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-    event = "Testmail"
-    trigger = "manuell"
-    subject = get_mail_subject(config, "Testnachricht")
-    entries = [("test.domain", "127.0.0.1", "OK")]
-    success, info = send_mail(config, subject, entries, timestamp, event, trigger)
-    if success:
-        return "OK", 200
-    else:
-        return f"Fehler: {info}", 500
-
-@app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per hour", methods=["POST"], error_message="Zu viele Fehlversuche. Bitte später erneut versuchen.")
-def login():
-    config = load_config()
-    error, disabled = None, False
-    if request.method == 'POST':
-        user = request.form['username']
-        pw = request.form['password']
-        if user == config.get("webuser") and pw == config.get("webpass"):
-            session['logged_in'] = True
-            return redirect(url_for('log_page'))
-        else:
-            error = "Falsche Zugangsdaten"
-    return render_template('login.html', error=error, disabled=disabled)
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
+# --- DynDNS Auto-Update Endpunkt ---
 @app.route('/update')
-@login_required
 def update():
     config = load_config()
-    username = config.get("username", "")
-    password = config.get("password", "")
-    ip = get_public_ip()
-    hostnames = config.get("domains", [])
-    results = []
-    new_log_entries = []
+    client_ip = get_remote_address()
     now = datetime.now(TIMEZONE)
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-    event = "Update"
-    trigger = "manuell"
-    mail_settings = get_mail_settings(config)
-    for domain in hostnames:
-        try:
-            resp = requests.get(
-                f"https://{username}:{password}@dyndns.strato.com/nic/update",
-                params={'hostname': domain, 'myip': ip}, timeout=10
-            )
-            text_raw = resp.text.strip() if resp.status_code == 200 else f"error {resp.status_code}"
-            text = text_raw.split(" ")[0]
-        except Exception:
-            text = "error"
-        results.append((domain, ip, text))
-        new_log_entries.append((timestamp, event, trigger, domain, ip, text))
-    append_log_entries(new_log_entries, get_log_retention_hours())
-    if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
-        subject = get_mail_subject(config, f"{event} erfolgreich")
-        send_mail(config, subject, results, timestamp, event, trigger)
-    return render_template('update.html', ip=ip, results=results)
+    
+    failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto.get(client_ip, []) if now - t < timedelta(hours=1)]
+    if len(failed_attempts_auto.get(client_ip, [])) >= 10:
+        return Response("abuse", mimetype='text/plain'), 429
 
-@app.route('/auto')
-def auto():
-    config = load_config()
     req_user = request.args.get('username')
     req_pass = request.args.get('password')
     req_ip = request.args.get('myip')
     ip_list = [i.strip() for i in req_ip.split(',')] if req_ip else [get_public_ip()]
-    client_ip = request.remote_addr
-    now = datetime.now(TIMEZONE)
-    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-    event = "Auto-Update"
-    trigger = "automatisch"
-    mail_settings = get_mail_settings(config)
-    hostnames = config.get("domains", [])
-    results = []
-    new_log_entries = []
-    failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto[client_ip] if now - t < timedelta(hours=1)]
-    if len(failed_attempts_auto[client_ip]) >= 5:
-        for domain in hostnames:
-            new_log_entries.append((timestamp, "Sperre", trigger, domain, ",".join(ip_list), "abuse"))
-            results.append((domain, ",".join(ip_list), "abuse"))
-        append_log_entries(new_log_entries, get_log_retention_hours())
-        if mail_settings.get("enabled") and mail_settings.get("notify_on_abuse"):
-            subject = get_mail_subject(config, "Sperre durch Missbrauchsversuche")
-            send_mail(config, subject, results, timestamp, "Sperre", trigger)
-        return Response(f"abuse {ip_list[0]}", mimetype='text/plain')
-    if not ip_list or not ip_list[0]:
-        for domain in hostnames:
-            new_log_entries.append((timestamp, event, trigger, domain, "keine IP", "noip"))
-            results.append((domain, "keine IP", "noip"))
-        append_log_entries(new_log_entries, get_log_retention_hours())
-        if mail_settings.get("enabled") and mail_settings.get("notify_on_noip"):
-            subject = get_mail_subject(config, "Keine IP verfügbar")
-            send_mail(config, subject, results, timestamp, event, trigger)
-        return Response("noip", mimetype="text/plain")
+    
+    # KORREKTUR: Logik für badauth
     if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
-        for domain in hostnames:
-            new_log_entries.append((timestamp, "Login fehlgeschlagen", trigger, domain, ",".join(ip_list), "badauth-web"))
-            results.append((domain, ",".join(ip_list), "badauth-web"))
-        append_log_entries(new_log_entries, get_log_retention_hours())
-        if mail_settings.get("enabled") and mail_settings.get("notify_on_badauth"):
-            subject = get_mail_subject(config, "Login fehlgeschlagen (Web)")
-            send_mail(config, subject, results, timestamp, "Login fehlgeschlagen", trigger)
-        return Response(f"badauth {ip_list[0]}", mimetype='text/plain')
+        
+        # Log-Einträge und Mail für badauth erstellen
+        hostnames = config.get("domains", [])
+        ms = get_mail_settings(config)
+        event = "Login fehlgeschlagen"
+        trigger = "automatisch"
+        status = "badauth"
+        
+        badauth_log_entries = [(timestamp, event, trigger, domain, ip_list[0] if ip_list else 'N/A', status) for domain in hostnames]
+        append_log_entries(badauth_log_entries)
+
+        if ms.get("enabled") and ms.get("notify_on_badauth"):
+            results = [(domain, ip_list[0] if ip_list else 'N/A', status) for domain in hostnames]
+            subject = f"{ms.get('subject', 'Strato DDNS')} – {event}"
+            send_mail(config, subject, results, timestamp, event, trigger)
+            
+        return Response("badauth", mimetype='text/plain'), 401
+
+    if not any(ip_list):
+        return Response("noip", mimetype='text/plain'), 400
+        
     username = config.get("username", "")
     password = config.get("password", "")
-    priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "good", "nochg"]
-    worst = "nochg"
-    worst_ip = ip_list[0]
+    hostnames = config.get("domains", [])
+    results, new_log_entries = [], []
+    
+    overall_status = "nochg"
+    status_priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "error", "good", "nochg"]
+
     for domain in hostnames:
         for ip in ip_list:
+            if not ip: continue
             try:
                 resp = requests.get(
                     f"https://{username}:{password}@dyndns.strato.com/nic/update",
                     params={'hostname': domain, 'myip': ip}, timeout=10
                 )
-                result_line = resp.text.strip()
-                status = result_line.split()[0] if resp.status_code == 200 else "error"
-            except Exception:
-                result_line = "error"
-                status = "error"
-            if priority.index(status) < priority.index(worst):
-                worst = status
-                worst_ip = ip
-            returned_ip = result_line.split()[1] if len(result_line.split()) > 1 else ip
-            new_log_entries.append((timestamp, event, trigger, domain, returned_ip, status))
-            results.append((domain, returned_ip, status))
-    append_log_entries(new_log_entries, get_log_retention_hours())
-    if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
-        subject = get_mail_subject(config, "Update erfolgreich")
-        send_mail(config, subject, results, timestamp, event, trigger)
-    return Response(f"{worst} {worst_ip}", mimetype='text/plain')
+                text_raw = resp.text.strip()
+                status = text_raw.split(" ")[0] if " " in text_raw else text_raw
+                returned_ip = text_raw.split(" ")[1] if len(text_raw.split()) > 1 else ip
+            except requests.RequestException:
+                status, returned_ip = "error", ip
 
-@app.errorhandler(404)
-def not_found(e):
-    if session.get('logged_in'):
-        return redirect(url_for('log_page'))
-    return redirect(url_for('login'))
+            results.append((domain, returned_ip, status))
+            new_log_entries.append((timestamp, "Auto-Update", "automatisch", domain, returned_ip, status))
+            
+            try:
+                if status_priority.index(status) < status_priority.index(overall_status):
+                    overall_status = status
+            except ValueError:
+                overall_status = "error"
+
+    if new_log_entries:
+        append_log_entries(new_log_entries)
+
+    ms = get_mail_settings(config)
+    if results and ms.get("enabled"):
+        has_success = any(r[2].lower() in ["good", "nochg"] for r in results)
+        has_error = not has_success
+        
+        if (ms.get("notify_on_success") and has_success) or (ms.get("notify_on_badauth") and has_error):
+            subject = f"{ms.get('subject', 'Strato DDNS')} – Auto-Update"
+            send_mail(config, subject, results, timestamp, "Auto-Update", "automatisch")
+
+    return Response(f"{overall_status} {ip_list[0]}", mimetype='text/plain')
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80)
-EOF_PY
+    app.run(host='0.0.0.0', port=80, debug=False)
