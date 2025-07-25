@@ -286,6 +286,7 @@ def download_log_excel():
                     dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
                 else:
                     dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
+                dt = dt.replace(tzinfo=TIMEZONE)
             except Exception:
                 continue
             if (now - dt) <= timedelta(hours=retention_hours):
