@@ -171,6 +171,31 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
               </div>
             </div>
 
+            <!-- Protokoll Einstellungen & Download -->
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingLog">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLog" aria-expanded="false" aria-controls="collapseLog" style="box-shadow:none !important;outline:none !important;">
+                  Protokoll
+                </button>
+              </h2>
+              <div id="collapseLog" class="accordion-collapse collapse" aria-labelledby="headingLog" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                  <form id="form-log-settings" autocomplete="off">
+                    <div class="form-floating mb-3">
+                      <input type="number" class="form-control" id="log_retention_hours" name="log_retention_hours" min="1" value="{{ log_retention_hours }}">
+                      <label for="log_retention_hours">Aufbewahrungsdauer (in Stunden)</label>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="saveLogSettings()">Speichern</button>
+                  </form>
+                  <hr>
+                  <button type="button" class="btn btn-primary" onclick="downloadExcel()">
+                    Protokoll als Excel herunterladen
+                  </button>
+                  <span id="logDownloadResult" class="ms-2"></span>
+                </div>
+              </div>
+            </div>
+
             <!-- Backup / Restore -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingBackup">
@@ -355,6 +380,47 @@ document.getElementById('testMailBtn').onclick = function() {
     btn.disabled = false;
   });
 };
+function saveLogSettings() {
+  clearMsg();
+  const val = document.getElementById('log_retention_hours').value;
+  const formData = new FormData();
+  formData.append("log_retention_hours", val);
+  fetch('/config/save_log_settings', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.success) showMsg(data.msg, "success");
+    else showMsg(data.msg, "danger");
+  });
+}
+function downloadExcel() {
+  clearMsg();
+  const result = document.getElementById('logDownloadResult');
+  result.textContent = "";
+  fetch('/log/download_excel')
+  .then(r => {
+    if (!r.ok) throw new Error("Fehler beim Download");
+    return r.blob();
+  })
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "strato_ddns_log.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    result.textContent = "✅ Download gestartet";
+    result.className = "ms-2 text-success";
+  })
+  .catch(e => {
+    result.textContent = "❌ Fehler beim Download";
+    result.className = "ms-2 text-danger";
+  });
+}
 </script>
 </body>
 </html>
