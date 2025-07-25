@@ -1,6 +1,6 @@
 #!/bin/bash
 cat > "$APP_DIR/app.py" <<'EOF_PY'
-from flask import Flask, render_template, request, redirect, url_for, session, Response
+from flask import Flask, render_template, request, redirect, url_for, session, Response, send_file, jsonify
 import requests, json, os, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -9,11 +9,14 @@ from flask_limiter.util import get_remote_address
 from flask_limiter.errors import RateLimitExceeded
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-TIMEZONE = ZoneInfo("Europe/Berlin")
-
 from collections import defaultdict
 from urllib.parse import urljoin
+from io import BytesIO
+from cryptography.fernet import Fernet
+import base64
+import hashlib
 
+TIMEZONE = ZoneInfo("Europe/Berlin")
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 LOG_FILE = os.path.join(os.path.dirname(__file__), 'log.xml')
@@ -81,15 +84,12 @@ def get_mail_subject(config, suffix=None):
 
 def build_html_mail(subject, entries, timestamp, event, trigger):
     from datetime import datetime
-
-    # Timestamp-String direkt umwandeln (und unter demselben Namen behalten)
     try:
-        # ISO-Format mit Mikrosekunden und Zeitzone parsen
         dt = datetime.fromisoformat(timestamp)
         timestamp = dt.strftime("%d.%m.%Y - %H:%M:%S") + " Uhr"
     except:
         pass
-    
+
     html_rows = ""
     for domain, ip, status in entries:
         color = "#198754" if status.lower().startswith(("good", "nochg")) else "#dc3545"
@@ -182,7 +182,6 @@ def send_mail(config, subject, entries, timestamp, event, trigger, decrypt_pw=No
 app = Flask(__name__, template_folder=TEMPLATES_DIR)
 app.secret_key = load_config()["secret_key"]
 limiter = Limiter(app=app, key_func=get_remote_address, storage_uri="memory://")
-
 failed_attempts_auto = defaultdict(list)
 
 def login_required(f):
@@ -221,62 +220,114 @@ def log_page():
     entries.sort(key=lambda x: x["datetime"], reverse=True)
     return render_template("log.html", log_entries=entries)
 
-@app.route('/config', methods=['GET', 'POST'])
+@app.route('/config')
 @login_required
 def config_page():
     config = load_config()
-    msg = ""
-
-    username = config.get("username", "")
-    password = config.get("password", "")
-    domains_str = "\n".join(config.get("domains", []))
-    mail_settings = get_mail_settings(config)
-
-    if request.method == "POST":
-        config["username"] = request.form.get("username", "")
-        config["password"] = request.form.get("password", "")
-        config["domains"] = [d.strip() for d in request.form.get("domains", "").splitlines() if d.strip()]
-        config["mail_settings"] = {
-            "enabled": "mail_enabled" in request.form,
-            "recipients": request.form.get("mail_recipients", ""),
-            "sender": request.form.get("mail_sender", ""),
-            "subject": request.form.get("mail_subject", ""),
-            "smtp_user": request.form.get("mail_smtp_user", ""),
-            "smtp_pass": request.form.get("mail_smtp_pass", ""),
-            "smtp_server": request.form.get("mail_smtp_server", ""),
-            "smtp_port": request.form.get("mail_smtp_port", ""),
-            "notify_on_success": "mail_notify_success" in request.form,
-            "notify_on_badauth": "mail_notify_badauth" in request.form,
-            "notify_on_noip": "mail_notify_noip" in request.form,
-            "notify_on_abuse": "mail_notify_abuse" in request.form,
-        }
-
-        save_config(config)
-        msg = "Gespeichert!"
-
-        if "run_update" in request.form:
-            return redirect(url_for("update"))
-
-        username = config["username"]
-        password = config["password"]
-        domains_str = "\n".join(config.get("domains", []))
-        mail_settings = config["mail_settings"]
-
     return render_template(
         'config.html',
-        username=username,
-        password=password,
-        domains=domains_str,
-        mail_settings=mail_settings,
-        msg=msg
+        username=config.get("username", ""),
+        password=config.get("password", ""),
+        domains="\n".join(config.get("domains", [])),
+        mail_settings=get_mail_settings(config),
+        msg=request.args.get("msg", ""),
+        error=request.args.get("error", "")
     )
+
+# --- Bereich: Einzelne Speichern-APIs (JSON) ---
+@app.route('/config/save_strato', methods=['POST'])
+@login_required
+def save_strato():
+    config = load_config()
+    config["username"] = request.form.get("username", "")
+    config["password"] = request.form.get("password", "")
+    config["domains"] = [d.strip() for d in request.form.get("domains", "").splitlines() if d.strip()]
+    save_config(config)
+    return jsonify(success=True, msg="Strato DDNS Einstellungen gespeichert.")
+
+@app.route('/config/save_mail', methods=['POST'])
+@login_required
+def save_mail():
+    config = load_config()
+    ms = config.get("mail_settings", {})
+    ms["enabled"] = "mail_enabled" in request.form
+    ms["recipients"] = request.form.get("mail_recipients", "")
+    ms["sender"] = request.form.get("mail_sender", "")
+    ms["subject"] = request.form.get("mail_subject", "")
+    ms["smtp_user"] = request.form.get("mail_smtp_user", "")
+    ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
+    ms["smtp_server"] = request.form.get("mail_smtp_server", "")
+    ms["smtp_port"] = request.form.get("mail_smtp_port", "")
+    ms["notify_on_success"] = "mail_notify_success" in request.form
+    ms["notify_on_badauth"] = "mail_notify_badauth" in request.form
+    ms["notify_on_noip"] = "mail_notify_noip" in request.form
+    ms["notify_on_abuse"] = "mail_notify_abuse" in request.form
+    config["mail_settings"] = ms
+    save_config(config)
+    return jsonify(success=True, msg="Mail-Benachrichtigungseinstellungen gespeichert.")
+
+@app.route('/config/save_access', methods=['POST'])
+@login_required
+def save_access():
+    config = load_config()
+    new_user = request.form.get("new_webuser", "").strip()
+    new_pass = request.form.get("new_webpass", "")
+    confirm_pass = request.form.get("confirm_webpass", "")
+    if not (new_user and new_pass and confirm_pass):
+        return jsonify(success=False, msg="Alle Felder ausfüllen!")
+    if new_pass != confirm_pass:
+        return jsonify(success=False, msg="Passwörter stimmen nicht überein!")
+    config["webuser"] = new_user
+    config["webpass"] = new_pass
+    save_config(config)
+    return jsonify(success=True, msg="Zugangsdaten wurden gespeichert.")
+
+# --- Sicherung & Wiederherstellung ---
+def derive_key(password: str) -> bytes:
+    return base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
+
+@app.route('/backup/download', methods=['POST'])
+@login_required
+def download_config():
+    pw = request.form.get("backup_password", "")
+    if not pw:
+        return "Kein Passwort angegeben", 400
+    key = derive_key(pw)
+    fernet = Fernet(key)
+    try:
+        with open(CONFIG_FILE, 'rb') as f:
+            encrypted = fernet.encrypt(f.read())
+        return send_file(
+            BytesIO(encrypted),
+            as_attachment=True,
+            download_name="config.json.enc",
+            mimetype="application/octet-stream"
+        )
+    except Exception as e:
+        return f"Fehler beim Erstellen der Sicherung: {e}", 500
+
+@app.route('/backup/upload', methods=['POST'])
+@login_required
+def upload_config():
+    pw = request.form.get("restore_password", "")
+    file = request.files.get("restore_file")
+    if not pw or not file:
+        return jsonify(success=False, msg="Datei oder Passwort fehlt!")
+    key = derive_key(pw)
+    fernet = Fernet(key)
+    try:
+        decrypted = fernet.decrypt(file.read())
+        with open(CONFIG_FILE, "wb") as f:
+            f.write(decrypted)
+        return jsonify(success=True, msg="Wiederherstellung erfolgreich!")
+    except Exception as e:
+        return jsonify(success=False, msg="Fehler: "+str(e))
 
 @app.route('/testmail', methods=['POST'])
 @login_required
 def testmail():
     config = load_config()
     ms = get_mail_settings(config)
-
     ms["enabled"] = True
     ms["recipients"] = request.form.get("mail_recipients", "")
     ms["sender"] = request.form.get("mail_sender", "")
@@ -285,14 +336,12 @@ def testmail():
     ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
     ms["smtp_server"] = request.form.get("mail_smtp_server", "")
     ms["smtp_port"] = request.form.get("mail_smtp_port", "")
-
     now = datetime.now(TIMEZONE)
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Testmail"
     trigger = "manuell"
     subject = get_mail_subject(config, "Testnachricht")
     entries = [("test.domain", "127.0.0.1", "OK")]
-
     success, info = send_mail(config, subject, entries, timestamp, event, trigger)
     if success:
         return "OK", 200
@@ -304,7 +353,6 @@ def testmail():
 def login():
     config = load_config()
     error, disabled = None, False
-
     if request.method == 'POST':
         user = request.form['username']
         pw = request.form['password']
@@ -313,7 +361,6 @@ def login():
             return redirect(url_for('log_page'))
         else:
             error = "Falsche Zugangsdaten"
-
     return render_template('login.html', error=error, disabled=disabled)
 
 @app.route('/logout')
@@ -335,7 +382,6 @@ def update():
     event = "Update"
     trigger = "manuell"
     mail_settings = get_mail_settings(config)
-
     for domain in hostnames:
         try:
             resp = requests.get(
@@ -348,11 +394,9 @@ def update():
             text = "error"
         results.append((domain, ip, text))
         log_entry(timestamp, event, trigger, domain, ip, text)
-
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, f"{event} erfolgreich")
         send_mail(config, subject, results, timestamp, event, trigger)
-
     return render_template('update.html', ip=ip, results=results)
 
 @app.route('/auto')
@@ -370,8 +414,6 @@ def auto():
     mail_settings = get_mail_settings(config)
     hostnames = config.get("domains", [])
     results = []
-
-    # Missbrauchsschutz (5 Fehlversuche)
     failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto[client_ip] if now - t < timedelta(hours=1)]
     if len(failed_attempts_auto[client_ip]) >= 5:
         for domain in hostnames:
@@ -381,8 +423,6 @@ def auto():
             subject = get_mail_subject(config, "Sperre durch Missbrauchsversuche")
             send_mail(config, subject, results, timestamp, "Sperre", trigger)
         return Response(f"abuse {ip_list[0]}", mimetype='text/plain')
-
-    # Keine IP verfügbar
     if not ip_list or not ip_list[0]:
         for domain in hostnames:
             log_entry(timestamp, event, trigger, domain, "keine IP", "noip")
@@ -391,8 +431,6 @@ def auto():
             subject = get_mail_subject(config, "Keine IP verfügbar")
             send_mail(config, subject, results, timestamp, event, trigger)
         return Response("noip", mimetype="text/plain")
-
-    # Web-Login fehlgeschlagen
     if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
         for domain in hostnames:
@@ -402,14 +440,11 @@ def auto():
             subject = get_mail_subject(config, "Login fehlgeschlagen (Web)")
             send_mail(config, subject, results, timestamp, "Login fehlgeschlagen", trigger)
         return Response(f"badauth {ip_list[0]}", mimetype='text/plain')
-
-    # Strato-Update
     username = config.get("username", "")
     password = config.get("password", "")
     priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "good", "nochg"]
     worst = "nochg"
     worst_ip = ip_list[0]
-
     for domain in hostnames:
         for ip in ip_list:
             try:
@@ -422,20 +457,15 @@ def auto():
             except Exception:
                 result_line = "error"
                 status = "error"
-
             if priority.index(status) < priority.index(worst):
                 worst = status
                 worst_ip = ip
-
             returned_ip = result_line.split()[1] if len(result_line.split()) > 1 else ip
             log_entry(timestamp, event, trigger, domain, returned_ip, status)
             results.append((domain, returned_ip, status))
-
-    # Mail bei Erfolg
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, "Update erfolgreich")
         send_mail(config, subject, results, timestamp, event, trigger)
-
     return Response(f"{worst} {worst_ip}", mimetype='text/plain')
 
 @app.errorhandler(404)
