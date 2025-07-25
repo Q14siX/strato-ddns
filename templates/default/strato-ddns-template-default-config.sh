@@ -1,427 +1,230 @@
-cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Strato DDNS</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/">Strato DDNS</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarConfig" aria-controls="navbarConfig" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarConfig">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="/log">Protokoll</a></li>
-        <li class="nav-item"><a class="nav-link active" href="/config">Konfiguration</a></li>
-      </ul>
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link" href="/logout">Logout</a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
+{% extends "_layout.html" %}
 
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-lg-10">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title mb-4">Konfiguration</h2>
-          <div id="globalMsg">
-            {% if msg %}
-              <div class="alert alert-success">{{ msg }}</div>
-            {% elif error %}
-              <div class="alert alert-danger">{{ error }}</div>
-            {% endif %}
-          </div>
-          <div class="accordion" id="settingsAccordion">
+{% block title %}Konfiguration{% endblock %}
 
-            <!-- Verwaltungszugang -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingAccess">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAccess" aria-expanded="true" aria-controls="collapseAccess" style="box-shadow:none !important;outline:none !important;">
-                  Verwaltungszugang
+{% block content %}
+<div class="max-w-4xl mx-auto" x-data="{ openAccordion: 'access' }">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Konfiguration</h1>
+    <div class="space-y-4">
+        
+        <!-- Accordion Item: Verwaltungszugang -->
+        <div>
+            <h2>
+                <button @click="openAccordion = openAccordion === 'access' ? '' : 'access'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
+                    <span>Verwaltungszugang</span>
+                    <svg :class="{'rotate-180': openAccordion === 'access'}" class="w-5 h-5 shrink-0 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
-              </h2>
-              <div id="collapseAccess" class="accordion-collapse collapse show" aria-labelledby="headingAccess" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-access" autocomplete="off">
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="new_webuser" id="new_webuser" placeholder="Neuer Benutzername">
-                      <label for="new_webuser">Neuer Benutzername</label>
+            </h2>
+            <div x-show="openAccordion === 'access'" class="p-5 bg-white border border-gray-200 rounded-b-md">
+                <form id="form-access" class="space-y-4">
+                    <div>
+                        <label for="new_webuser" class="block text-sm font-medium text-gray-700">Neuer Benutzername</label>
+                        <input type="text" name="new_webuser" id="new_webuser" class="input-field" placeholder="Aktuellen beibehalten">
                     </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="new_webpass" id="new_webpass" placeholder="Neues Passwort">
-                      <label for="new_webpass">Neues Passwort</label>
+                    <div>
+                        <label for="new_webpass" class="block text-sm font-medium text-gray-700">Neues Passwort</label>
+                        <input type="password" name="new_webpass" id="new_webpass" class="input-field" placeholder="••••••••">
                     </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="confirm_webpass" id="confirm_webpass" placeholder="Passwort bestätigen">
-                      <label for="confirm_webpass">Passwort wiederholen</label>
+                    <div>
+                        <label for="confirm_webpass" class="block text-sm font-medium text-gray-700">Passwort wiederholen</label>
+                        <input type="password" name="confirm_webpass" id="confirm_webpass" class="input-field" placeholder="••••••••">
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="saveAccess()">Speichern</button>
-                  </form>
-                </div>
-              </div>
+                    <div class="text-right">
+                        <button type="button" onclick="saveForm('form-access', 'access')" class="form-button">Speichern</button>
+                    </div>
+                </form>
             </div>
-
-            <!-- Strato DDNS Einstellungen -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingStrato">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStrato" aria-expanded="false" aria-controls="collapseStrato" style="box-shadow:none !important;outline:none !important;">
-                  Strato DDNS
-                </button>
-              </h2>
-              <div id="collapseStrato" class="accordion-collapse collapse" aria-labelledby="headingStrato" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-strato" autocomplete="off">
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="username" id="username" placeholder="Strato Benutzername" value="{{ username }}">
-                      <label for="username">Strato Benutzername</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="password" id="password" placeholder="Strato Passwort" value="{{ password }}">
-                      <label for="password">Strato Passwort</label>
-                    </div>
-                    <div class="mb-3">
-                      <label>Domains (eine pro Zeile)</label>
-                      <textarea class="form-control" name="domains" rows="5">{{ domains }}</textarea>
-                    </div>
-                    <div class="mb-3 d-flex gap-2">
-                      <button type="button" class="btn btn-primary" onclick="saveStrato()">Speichern</button>
-                      <button type="button" class="btn btn-secondary" onclick="runUpdate()">Update jetzt ausführen</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <!-- Mail-Benachrichtigung Einstellungen -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingMail">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMail" aria-expanded="false" aria-controls="collapseMail" style="box-shadow:none !important;outline:none !important;">
-                  Mail-Benachrichtigungen
-                </button>
-              </h2>
-              <div id="collapseMail" class="accordion-collapse collapse" aria-labelledby="headingMail" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-mail" autocomplete="off">
-                    <div class="form-check form-switch mb-3">
-                      <input class="form-check-input" type="checkbox" name="mail_enabled" id="mail_enabled" {% if mail_settings.enabled %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_enabled">Mail-Benachrichtigungen aktivieren</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="mail_recipients" id="mail_recipients" placeholder="Empfängeradresse(n)" value="{{ mail_settings.recipients }}">
-                      <label for="mail_recipients">Empfängeradresse(n) (Komma getrennt)</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="mail_sender" id="mail_sender" placeholder="Absenderadresse" value="{{ mail_settings.sender }}">
-                      <label for="mail_sender">Absenderadresse</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="mail_subject" id="mail_subject" placeholder="Betreff" value="{{ mail_settings.subject }}">
-                      <label for="mail_subject">Betreff</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="mail_smtp_user" id="mail_smtp_user" placeholder="SMTP-Benutzername" value="{{ mail_settings.smtp_user }}">
-                      <label for="mail_smtp_user">SMTP-Benutzername</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="mail_smtp_pass" id="mail_smtp_pass" placeholder="SMTP-Passwort" value="{{ mail_settings.smtp_pass }}">
-                      <label for="mail_smtp_pass">SMTP-Passwort</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="mail_smtp_server" id="mail_smtp_server" placeholder="SMTP-Server" value="{{ mail_settings.smtp_server }}">
-                      <label for="mail_smtp_server">SMTP-Server</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="number" class="form-control" name="mail_smtp_port" id="mail_smtp_port" placeholder="SMTP-Port" value="{{ mail_settings.smtp_port }}">
-                      <label for="mail_smtp_port">SMTP-Port</label>
-                    </div>
-                    <label class="form-label mt-3">Wann sollen E-Mails gesendet werden?</label>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" name="mail_notify_success" id="mail_notify_success" {% if mail_settings.notify_on_success %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_success">Update erfolgreich (IP wurde aktualisiert)</label>
-                    </div>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" name="mail_notify_badauth" id="mail_notify_badauth" {% if mail_settings.notify_on_badauth %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_badauth">Strato DDNS: Login fehlgeschlagen</label>
-                    </div>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" name="mail_notify_noip" id="mail_notify_noip" {% if mail_settings.notify_on_noip %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_noip">Keine IP verfügbar</label>
-                    </div>
-                    <div class="form-check form-switch mb-3">
-                      <input class="form-check-input" type="checkbox" name="mail_notify_abuse" id="mail_notify_abuse" {% if mail_settings.notify_on_abuse %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_abuse">DDNS Sperre durch Missbrauchsversuche</label>
-                    </div>
-                    <div class="mb-3 d-flex gap-2">
-                      <button type="button" class="btn btn-primary" onclick="saveMail()">Speichern</button>
-                      <button type="button" class="btn btn-secondary" id="testMailBtn">Mail-Einstellungen testen</button>
-                      <span id="mailTestResult" class="ms-2"></span>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <!-- Protokoll Einstellungen & Download -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingLog">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLog" aria-expanded="false" aria-controls="collapseLog" style="box-shadow:none !important;outline:none !important;">
-                  Protokoll
-                </button>
-              </h2>
-              <div id="collapseLog" class="accordion-collapse collapse" aria-labelledby="headingLog" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-log-settings" autocomplete="off">
-                    <div class="form-floating mb-3">
-                      <input type="number" class="form-control" id="log_retention_hours" name="log_retention_hours" min="1" value="{{ log_retention_hours }}">
-                      <label for="log_retention_hours">Aufbewahrungsdauer (in Stunden)</label>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="saveLogSettings()">Speichern</button>
-                  </form>
-                  <hr>
-                  <button type="button" class="btn btn-primary" onclick="downloadExcel()">
-                    Protokoll als Excel herunterladen
-                  </button>
-                  <span id="logDownloadResult" class="ms-2"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Backup / Restore -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingBackup">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBackup" aria-expanded="false" aria-controls="collapseBackup" style="box-shadow:none !important;outline:none !important;">
-                  Sichern & Wiederherstellen
-                </button>
-              </h2>
-              <div id="collapseBackup" class="accordion-collapse collapse" aria-labelledby="headingBackup" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-backup" class="mb-2" onsubmit="return false;">
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="backup_password" id="backup_password" placeholder="Passwort">
-                      <label for="backup_password">Passwort für Verschlüsselung</label>
-                    </div>
-                    <button type="button" class="btn btn-primary" id="downloadConfigBtn">Sichern</button>
-                  </form>
-                  <hr>
-                  <form id="form-restore" enctype="multipart/form-data" onsubmit="return false;">
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="restore_password" id="restore_password" placeholder="Passwort">
-                      <label for="restore_password">Passwort zum Entschlüsseln</label>
-                    </div>
-                    <div class="mb-3">
-                      <label for="restore_file" class="form-label">Datei auswählen (.enc)</label>
-                      <input class="form-control" type="file" id="restore_file" name="restore_file" accept=".enc">
-                    </div>
-                    <button type="button" class="btn btn-primary" id="restoreBtn">Wiederherstellen</button>
-                    <span id="restoreResult" class="ms-2"></span>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-          </div>
         </div>
-      </div>
+
+        <!-- Accordion Item: Strato DDNS -->
+        <div>
+            <h2>
+                <button @click="openAccordion = openAccordion === 'strato' ? '' : 'strato'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
+                    <span>Strato DDNS</span>
+                    <svg :class="{'rotate-180': openAccordion === 'strato'}" class="w-5 h-5 shrink-0 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </h2>
+            <div x-show="openAccordion === 'strato'" class="p-5 bg-white border border-gray-200 rounded-b-md">
+                <form id="form-strato" class="space-y-4">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700">Strato Benutzername</label>
+                        <input type="text" name="username" id="username" value="{{ username }}" class="input-field">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700">Strato Passwort</label>
+                        <input type="password" name="password" id="password" value="{{ password }}" class="input-field">
+                    </div>
+                    <div>
+                        <label for="domains" class="block text-sm font-medium text-gray-700">Domains (eine pro Zeile)</label>
+                        <textarea name="domains" id="domains" rows="5" class="input-field">{{ domains }}</textarea>
+                    </div>
+                    <div class="text-right space-x-2">
+                        <button type="button" onclick="startUpdate()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Update jetzt ausführen</button>
+                        <button type="button" onclick="saveForm('form-strato', 'strato')" class="form-button">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Accordion Item: Mail-Benachrichtigungen -->
+        <div>
+            <h2>
+                <button @click="openAccordion = openAccordion === 'mail' ? '' : 'mail'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
+                    <span>Mail-Benachrichtigungen</span>
+                    <svg :class="{'rotate-180': openAccordion === 'mail'}" class="w-5 h-5 shrink-0 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </h2>
+            <div x-show="openAccordion === 'mail'" class="p-5 bg-white border border-gray-200 rounded-b-md">
+                <form id="form-mail" class="space-y-4">
+                    <div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_enabled" name="mail_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.enabled %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_enabled" class="font-medium text-gray-700">Mail-Benachrichtigungen aktivieren</label></div></div>
+                    <div class="space-y-4">
+                        <input type="text" name="mail_recipients" placeholder="Empfänger (Komma-getrennt)" value="{{ mail_settings.recipients }}" class="input-field">
+                        <input type="text" name="mail_sender" placeholder="Absenderadresse" value="{{ mail_settings.sender }}" class="input-field">
+                        <input type="text" name="mail_subject" placeholder="Betreff" value="{{ mail_settings.subject }}" class="input-field">
+                        <input type="text" name="mail_smtp_server" placeholder="SMTP-Server" value="{{ mail_settings.smtp_server }}" class="input-field">
+                        <input type="number" name="mail_smtp_port" placeholder="SMTP-Port" value="{{ mail_settings.smtp_port }}" class="input-field">
+                        <input type="text" name="mail_smtp_user" placeholder="SMTP-Benutzername" value="{{ mail_settings.smtp_user }}" class="input-field">
+                        <input type="password" name="mail_smtp_pass" placeholder="SMTP-Passwort" value="{{ mail_settings.smtp_pass }}" class="input-field">
+                    </div>
+                    <fieldset class="mt-4"><legend class="text-sm font-medium text-gray-900">Wann sollen E-Mails gesendet werden?</legend><div class="mt-2 space-y-2"><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_success" name="mail_notify_success" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_success %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_success" class="text-gray-600">Update erfolgreich</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_badauth" name="mail_notify_badauth" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_badauth %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_badauth" class="text-gray-600">Login fehlgeschlagen</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_noip" name="mail_notify_noip" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_noip %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_noip" class="text-gray-600">Keine IP verfügbar</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_abuse" name="mail_notify_abuse" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_abuse %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_abuse" class="text-gray-600">DDNS Sperre</label></div></div></div></fieldset>
+                    <div class="text-right space-x-2">
+                        <button type="button" id="testMailBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Testen</button>
+                        <button type="button" onclick="saveForm('form-mail', 'mail')" class="form-button">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Accordion Item: Protokoll & Backup -->
+        <div>
+            <h2>
+                <button @click="openAccordion = openAccordion === 'system' ? '' : 'system'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
+                    <span>Protokoll & Sicherung</span>
+                    <svg :class="{'rotate-180': openAccordion === 'system'}" class="w-5 h-5 shrink-0 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </h2>
+            <div x-show="openAccordion === 'system'" class="p-5 bg-white border border-gray-200 rounded-b-md divide-y">
+                <form id="form-log_settings" class="py-4 space-y-2">
+                    <label for="log_retention_hours" class="block text-sm font-medium text-gray-700">Aufbewahrungsdauer Protokoll (in Stunden)</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" name="log_retention_hours" id="log_retention_hours" value="{{ log_retention_hours }}" min="1" class="input-field flex-grow">
+                        <button type="button" onclick="saveForm('form-log_settings', 'log_settings')" class="form-button">Speichern</button>
+                    </div>
+                </form>
+                <div class="py-4 space-y-4">
+                    <form id="form-backup" class="space-y-2">
+                        <label for="backup_password" class="block text-sm font-medium text-gray-700">Passwort für Sicherung</label>
+                        <input type="password" name="backup_password" id="backup_password" class="input-field" placeholder="••••••••">
+                        <button type="button" id="backupBtn" class="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Sicherung erstellen</button>
+                    </form>
+                    <form id="form-restore" class="space-y-2">
+                        <label for="restore_password" class="block text-sm font-medium text-gray-700">Passwort für Wiederherstellung</label>
+                        <input type="password" name="restore_password" id="restore_password" class="input-field" placeholder="••••••••">
+                        <label for="restore_file" class="block text-sm font-medium text-gray-700">Sicherungsdatei</label>
+                        <input type="file" name="restore_file" id="restore_file" accept=".enc" class="input-field file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-primary hover:file:bg-blue-100">
+                        <button type="button" id="restoreBtn" class="w-full form-button">Wiederherstellen</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
+{% block scripts %}
 <script>
-function showMsg(html, type="success") {
-  const msgBox = document.getElementById('globalMsg');
-  msgBox.innerHTML = `<div class="alert alert-${type}">${html}</div>`;
-}
-function clearMsg() {
-  document.getElementById('globalMsg').innerHTML = "";
-}
-function saveStrato() {
-  clearMsg();
-  const form = document.getElementById('form-strato');
-  const data = new FormData(form);
-  fetch('/config/save_strato', {
-    method: 'POST',
-    body: data
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) showMsg(data.msg, "success");
-    else showMsg(data.msg, "danger");
-  });
-}
-function saveMail() {
-  clearMsg();
-  const form = document.getElementById('form-mail');
-  const data = new FormData(form);
-  fetch('/config/save_mail', {
-    method: 'POST',
-    body: data
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) showMsg(data.msg, "success");
-    else showMsg(data.msg, "danger");
-  });
-}
-function saveAccess() {
-  clearMsg();
-  const form = document.getElementById('form-access');
-  const data = new FormData(form);
-  fetch('/config/save_access', {
-    method: 'POST',
-    body: data
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) showMsg(data.msg, "success");
-    else showMsg(data.msg, "danger");
-  });
-}
-function runUpdate() {
-  window.location.href = "/update";
-}
-document.getElementById('downloadConfigBtn').onclick = function() {
-  clearMsg();
-  const pw = document.getElementById('backup_password').value;
-  if (!pw) {
-    showMsg("Bitte ein Passwort für die Sicherung eingeben!", "danger");
-    return;
-  }
-  const form = document.getElementById('form-backup');
-  const formData = new FormData();
-  formData.append('backup_password', pw);
-  fetch('/backup/download', {
-    method: 'POST',
-    body: formData
-  }).then(r => {
-    if (!r.ok) throw new Error("Fehler beim Download");
-    return r.blob();
-  }).then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = "config.json.enc";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-    showMsg("Konfiguration wurde heruntergeladen.", "success");
-  }).catch(e => {
-    showMsg("Fehler beim Download: " + e.message, "danger");
-  });
-};
-document.getElementById('restoreBtn').onclick = function() {
-  clearMsg();
-  const pw = document.getElementById('restore_password').value;
-  const file = document.getElementById('restore_file').files[0];
-  const result = document.getElementById('restoreResult');
-  if (!pw || !file) {
-    result.textContent = "❌ Datei und Passwort angeben!";
-    result.className = "ms-2 text-danger";
-    return;
-  }
-  const formData = new FormData();
-  formData.append('restore_password', pw);
-  formData.append('restore_file', file);
-  fetch('/backup/upload', {
-    method: 'POST',
-    body: formData
-  })
-  .then(r => r.json())
-  .then(data => {
-    if(data.success) {
-      result.textContent = "✅ Wiederherstellung erfolgreich!";
-      result.className = "ms-2 text-success";
-      showMsg("Wiederherstellung erfolgreich!", "success");
-      setTimeout(()=>location.reload(), 1500);
-    } else {
-      result.textContent = "❌ "+data.msg;
-      result.className = "ms-2 text-danger";
-      showMsg(data.msg, "danger");
+    function saveForm(formId, apiEndpoint) {
+        const form = document.getElementById(formId);
+        const formData = new FormData(form);
+        
+        showModal('Speichere...', 'info');
+        fetch(`/api/save/${apiEndpoint}`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showModal(data.message, 'success');
+                } else {
+                    showModal(data.message || 'Ein unbekannter Fehler ist aufgetreten.', 'danger');
+                }
+            })
+            .catch(err => showModal(`Netzwerkfehler: ${err}`, 'danger'));
     }
-  })
-  .catch(e => {
-    result.textContent = "❌ Fehler!";
-    result.className = "ms-2 text-danger";
-    showMsg("Fehler: " + e.message, "danger");
-  });
-};
-// Testmail bleibt
-document.getElementById('testMailBtn').onclick = function() {
-  const btn = this;
-  const result = document.getElementById('mailTestResult');
-  btn.disabled = true;
-  result.textContent = "Teste...";
-  result.className = "ms-2 text-secondary";
-  const form = document.getElementById('form-mail');
-  const data = new FormData(form);
-  fetch('/testmail', {
-    method: 'POST',
-    body: data
-  }).then(r => {
-    if (r.ok) return r.text();
-    else throw new Error("Fehler beim Senden");
-  }).then(msg => {
-    result.textContent = "✅ Test erfolgreich!";
-    result.className = "ms-2 text-success";
-  }).catch(e => {
-    result.textContent = "❌ Test fehlgeschlagen!";
-    result.className = "ms-2 text-danger";
-  }).finally(() => {
-    btn.disabled = false;
-  });
-};
-function saveLogSettings() {
-  clearMsg();
-  const val = document.getElementById('log_retention_hours').value;
-  const formData = new FormData();
-  formData.append("log_retention_hours", val);
-  fetch('/config/save_log_settings', {
-    method: 'POST',
-    body: formData
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) showMsg(data.msg, "success");
-    else showMsg(data.msg, "danger");
-  });
-}
-function downloadExcel() {
-  clearMsg();
-  const result = document.getElementById('logDownloadResult');
-  result.textContent = "";
-  fetch('/log/download_excel')
-  .then(r => {
-    if (!r.ok) throw new Error("Fehler beim Download");
-    return r.blob();
-  })
-  .then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = "strato_ddns_log.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-    result.textContent = "✅ Download gestartet";
-    result.className = "ms-2 text-success";
-  })
-  .catch(e => {
-    result.textContent = "❌ Fehler beim Download";
-    result.className = "ms-2 text-danger";
-  });
-}
+
+    function startUpdate() {
+        showModal('Das Update wird gestartet...', 'info', 'Update läuft');
+        setTimeout(() => {
+            window.location.href = "{{ url_for('webupdate_page') }}";
+        }, 1500); // 1.5 Sekunden Verzögerung
+    }
+
+    document.getElementById('testMailBtn').addEventListener('click', function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Sende...';
+        const formData = new FormData(document.getElementById('form-mail'));
+        showModal('Sende Test-Mail...', 'info');
+        fetch('/api/testmail', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => data.success ? showModal(data.message, 'success') : showModal(data.message, 'danger'))
+            .catch(err => showModal(`Netzwerkfehler: ${err}`, 'danger'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Testen';
+            });
+    });
+
+    document.getElementById('backupBtn').addEventListener('click', function() {
+        const pw = document.getElementById('backup_password').value;
+        if (!pw) {
+            showModal('Bitte geben Sie ein Passwort für die Verschlüsselung an.', 'warning');
+            return;
+        }
+        const formData = new FormData(document.getElementById('form-backup'));
+        showModal('Sicherung wird erstellt...', 'info');
+        fetch('/api/backup/download', { method: 'POST', body: formData })
+            .then(async res => {
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({message: 'Serverfehler'}));
+                    throw new Error(data.message || 'Unbekannter Fehler');
+                }
+                return res.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'strato_ddns_backup.json.enc';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                showModal('Sicherung wurde erfolgreich heruntergeladen.', 'success');
+            })
+            .catch(err => showModal(`Fehler bei der Sicherung: ${err.message}`, 'danger'));
+    });
+
+    document.getElementById('restoreBtn').addEventListener('click', function() {
+        const pw = document.getElementById('restore_password').value;
+        const file = document.getElementById('restore_file').files[0];
+        if (!pw || !file) {
+            showModal('Bitte wählen Sie eine Datei und geben Sie das Passwort an.', 'warning');
+            return;
+        }
+        const formData = new FormData(document.getElementById('form-restore'));
+        formData.append('restore_password', pw);
+        formData.append('restore_file', file);
+        showModal('Sicherung wird wiederhergestellt...', 'info');
+        fetch('/api/backup/restore', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showModal(data.message, 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    showModal(data.message, 'danger');
+                }
+            })
+            .catch(err => showModal(`Netzwerkfehler: ${err}`, 'danger'));
+    });
 </script>
-</body>
-</html>
-EOF_HTML
+{% endblock %}
