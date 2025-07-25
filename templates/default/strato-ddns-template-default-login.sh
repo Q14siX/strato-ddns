@@ -1,3 +1,4 @@
+cat > "$APP_DIR/templates/login.html" <<'EOF_HTML'
 {% extends "_layout.html" %}
 
 {% block title %}Login{% endblock %}
