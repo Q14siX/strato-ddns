@@ -24,7 +24,7 @@ run_remote_script() {
 }
 
 echo "== System-Update & Installation benötigter Pakete =="
-apt-get update
+apt-get update && apt-get upgrade
 apt-get install -y \
   python3 \
   python3-pip \
