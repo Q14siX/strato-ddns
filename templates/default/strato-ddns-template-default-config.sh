@@ -19,9 +19,11 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
         <li class="nav-item"><a class="nav-link" href="/log">Protokoll</a></li>
         <li class="nav-item"><a class="nav-link active" href="/config">Konfiguration</a></li>
       </ul>
-      <span class="navbar-text">
-        <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
-      </span>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/logout">Logout</a>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>
@@ -41,10 +43,38 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
           </div>
           <div class="accordion" id="settingsAccordion">
 
+            <!-- Verwaltungszugang -->
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingAccess">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAccess" aria-expanded="true" aria-controls="collapseAccess" style="box-shadow:none !important;outline:none !important;">
+                  Verwaltungszugang
+                </button>
+              </h2>
+              <div id="collapseAccess" class="accordion-collapse collapse" aria-labelledby="headingAccess" data-bs-parent="#settingsAccordion">
+                <div class="accordion-body">
+                  <form id="form-access" autocomplete="off">
+                    <div class="form-floating mb-3">
+                      <input type="text" class="form-control" name="new_webuser" id="new_webuser" placeholder="Neuer Benutzername">
+                      <label for="new_webuser">Neuer Benutzername</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                      <input type="password" class="form-control" name="new_webpass" id="new_webpass" placeholder="Neues Passwort">
+                      <label for="new_webpass">Neues Passwort</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                      <input type="password" class="form-control" name="confirm_webpass" id="confirm_webpass" placeholder="Passwort bestätigen">
+                      <label for="confirm_webpass">Passwort wiederholen</label>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="saveAccess()">Speichern</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+
             <!-- Strato DDNS Einstellungen -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingStrato">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStrato" aria-expanded="true" aria-controls="collapseStrato" style="box-shadow:none !important;outline:none !important;">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStrato" aria-expanded="false" aria-controls="collapseStrato" style="box-shadow:none !important;outline:none !important;">
                   Strato DDNS
                 </button>
               </h2>
@@ -117,19 +147,19 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                     <label class="form-label mt-3">Wann sollen E-Mails gesendet werden?</label>
                     <div class="form-check form-switch">
                       <input class="form-check-input" type="checkbox" name="mail_notify_success" id="mail_notify_success" {% if mail_settings.notify_on_success %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_success">✅ Update erfolgreich (IP wurde aktualisiert)</label>
+                      <label class="form-check-label" for="mail_notify_success">Update erfolgreich (IP wurde aktualisiert)</label>
                     </div>
                     <div class="form-check form-switch">
                       <input class="form-check-input" type="checkbox" name="mail_notify_badauth" id="mail_notify_badauth" {% if mail_settings.notify_on_badauth %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_badauth">⚠️ Strato DDNS: Login fehlgeschlagen</label>
+                      <label class="form-check-label" for="mail_notify_badauth">Strato DDNS: Login fehlgeschlagen</label>
                     </div>
                     <div class="form-check form-switch">
                       <input class="form-check-input" type="checkbox" name="mail_notify_noip" id="mail_notify_noip" {% if mail_settings.notify_on_noip %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_noip">❌ Keine IP verfügbar</label>
+                      <label class="form-check-label" for="mail_notify_noip">Keine IP verfügbar</label>
                     </div>
                     <div class="form-check form-switch mb-3">
                       <input class="form-check-input" type="checkbox" name="mail_notify_abuse" id="mail_notify_abuse" {% if mail_settings.notify_on_abuse %}checked{% endif %}>
-                      <label class="form-check-label" for="mail_notify_abuse">⛔ DDNS Sperre durch Missbrauchsversuche</label>
+                      <label class="form-check-label" for="mail_notify_abuse">DDNS Sperre durch Missbrauchsversuche</label>
                     </div>
                     <div class="mb-3 d-flex gap-2">
                       <button type="button" class="btn btn-primary" onclick="saveMail()">Speichern</button>
@@ -153,50 +183,22 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                   <form id="form-backup" class="mb-2" onsubmit="return false;">
                     <div class="form-floating mb-3">
                       <input type="password" class="form-control" name="backup_password" id="backup_password" placeholder="Passwort">
-                      <label for="backup_password">🔒 Passwort für Verschlüsselung</label>
+                      <label for="backup_password">Passwort für Verschlüsselung</label>
                     </div>
-                    <button type="button" class="btn btn-success" id="downloadConfigBtn">🔽 Konfiguration herunterladen</button>
+                    <button type="button" class="btn btn-primary" id="downloadConfigBtn">Konfiguration herunterladen</button>
                   </form>
                   <hr>
                   <form id="form-restore" enctype="multipart/form-data" onsubmit="return false;">
                     <div class="form-floating mb-3">
                       <input type="password" class="form-control" name="restore_password" id="restore_password" placeholder="Passwort">
-                      <label for="restore_password">🔑 Passwort zum Entschlüsseln</label>
+                      <label for="restore_password">Passwort zum Entschlüsseln</label>
                     </div>
                     <div class="mb-3">
-                      <label for="restore_file" class="form-label">⚙️ Datei auswählen (.enc)</label>
+                      <label for="restore_file" class="form-label">Datei auswählen (.enc)</label>
                       <input class="form-control" type="file" id="restore_file" name="restore_file" accept=".enc">
                     </div>
-                    <button type="button" class="btn btn-warning" id="restoreBtn">🔁 Wiederherstellen</button>
+                    <button type="button" class="btn btn-primary" id="restoreBtn">Wiederherstellen</button>
                     <span id="restoreResult" class="ms-2"></span>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <!-- Zugangsdaten ändern -->
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingAccess">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAccess" aria-expanded="false" aria-controls="collapseAccess" style="box-shadow:none !important;outline:none !important;">
-                  Zugangsdaten ändern
-                </button>
-              </h2>
-              <div id="collapseAccess" class="accordion-collapse collapse" aria-labelledby="headingAccess" data-bs-parent="#settingsAccordion">
-                <div class="accordion-body">
-                  <form id="form-access" autocomplete="off">
-                    <div class="form-floating mb-3">
-                      <input type="text" class="form-control" name="new_webuser" id="new_webuser" placeholder="Neuer Benutzername">
-                      <label for="new_webuser">👤 Neuer Benutzername</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="new_webpass" id="new_webpass" placeholder="Neues Passwort">
-                      <label for="new_webpass">🔒 Neues Passwort</label>
-                    </div>
-                    <div class="form-floating mb-3">
-                      <input type="password" class="form-control" name="confirm_webpass" id="confirm_webpass" placeholder="Passwort bestätigen">
-                      <label for="confirm_webpass">🔁 Passwort wiederholen</label>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="saveAccess()">Speichern</button>
                   </form>
                 </div>
               </div>
