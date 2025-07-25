@@ -50,7 +50,7 @@ cat > "$APP_DIR/templates/update.html" <<'EOF_HTML'
           </ul>
           <div class="row mt-4">
             <div class="col-12 d-grid gap-2">
-              <a href="/config" class="btn btn-primary">Zurück zur Konfiguration</a>
+              <a href="/config" class="btn btn-primary">Zurück</a>
             </div>
           </div>
         </div>
