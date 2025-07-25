@@ -55,7 +55,9 @@ run_remote_script "scripts/strato-ddns-app.sh"
 run_remote_script "templates/default/strato-ddns-template-default-log.sh"
 run_remote_script "templates/default/strato-ddns-template-default-config.sh"
 run_remote_script "templates/default/strato-ddns-template-default-login.sh"
-run_remote_script "templates/default/strato-ddns-template-default-update.sh"
+run_remote_script "templates/default/strato-ddns-template-default-webupdate.sh"
+run_remote_script "templates/default/strato-ddns-template-default-header.sh"
+run_remote_script "templates/default/strato-ddns-template-default-layout.sh"
 
 # ========== Systemd-Service einspielen ==========
 run_remote_script "scripts/strato-ddns-service.sh"
