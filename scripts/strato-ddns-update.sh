@@ -48,8 +48,7 @@ apt-get install -y \
 echo "== Python-Abhängigkeiten (pip) installieren =="
 pip3 install --upgrade pip
 
-pip3 install \
-  openpyxl
+pip3 install --break-system-packages openpyxl
 
 rm -rf "$APP_DIR/templates"
 mkdir -p "$APP_DIR/templates"
