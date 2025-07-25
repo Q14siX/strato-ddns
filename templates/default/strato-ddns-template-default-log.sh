@@ -1,3 +1,4 @@
+cat > "$APP_DIR/templates/log.html" <<'EOF_HTML'
 {% extends "_layout.html" %}
 
 {% block title %}Protokoll{% endblock %}
@@ -164,3 +165,4 @@
     }
 </script>
 {% endblock %}
+EOF_HTML
