@@ -23,24 +23,6 @@ fi
 
 echo
 echo "🔓 Hebe eventuelle Sperren auf …"
-
-python3 - <<EOF
-import json
-
-config_path = "$CONFIG_FILE"
-
-with open(config_path) as f:
-    config = json.load(f)
-
-if config.get("lock"):
-    config["lock"] = False
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=4)
-    print("✅ Sperre wurde entfernt.")
-else:
-    print("ℹ️  Keine Sperre vorhanden.")
-EOF
-
 echo
 echo "[+] Starte den Dienst $SERVICE_NAME neu …"
 systemctl restart "$SERVICE_NAME"
