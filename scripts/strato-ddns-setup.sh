@@ -36,6 +36,12 @@ apt-get install -y \
   ca-certificates \
   sudo
 
+echo "== Python-Abhängigkeiten (pip) installieren =="
+pip3 install --upgrade pip
+
+pip3 install \
+  openpyxl
+
 mkdir -p "$APP_DIR/templates"
 
 echo "[+] Zugangsdaten für Web-Login festlegen:"
