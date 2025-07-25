@@ -1,44 +1,29 @@
-#!/bin/bash
-cat > "$APP_DIR/templates/login.html" <<'EOF_HTML'
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Strato DDNS</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">Strato DDNS</a>
-  </div>
-</nav>
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-4">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-center mb-4">Login</h2>
-          {% if error %}
-            <div class="alert alert-danger text-center">{{ error }}</div>
-          {% endif %}
-          <form method="post">
-            <div class="form-floating mb-3">
-              <input type="text" class="form-control" id="username" name="username" placeholder="Benutzername" required>
-              <label for="username">Benutzername</label>
-            </div>
-            <div class="form-floating mb-3">
-              <input type="password" class="form-control" id="password" name="password" placeholder="Passwort" required>
-              <label for="password">Passwort</label>
-            </div>
-            <button type="submit" class="btn btn-primary w-100" {% if disabled %}disabled{% endif %}>Anmelden</button>
-          </form>
+{% extends "_layout.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8">
+        <div class="w-full max-w-md px-8 py-10 bg-white shadow-lg rounded-lg">
+            <h2 class="text-center text-2xl font-bold tracking-tight text-gray-900">Anmelden</h2>
+            
+            <form class="mt-8 space-y-6" action="{{ url_for('login') }}" method="POST">
+                <div>
+                    <label for="username" class="sr-only">Benutzername</label>
+                    <input id="username" name="username" type="text" autocomplete="username" required class="input-field" placeholder="Benutzername">
+                </div>
+                <div>
+                    <label for="password" class="sr-only">Passwort</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required class="input-field" placeholder="Passwort">
+                </div>
+                <div>
+                    <button type="submit" class="w-full flex justify-center rounded-md border border-transparent bg-primary py-2 px-4 text-sm font-medium text-white hover:bg-primary-darker focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Anmelden
+                    </button>
+                </div>
+            </form>
         </div>
-      </div>
     </div>
-  </div>
 </div>
-</body>
-</html>
-EOF_HTML
+{% endblock %}
