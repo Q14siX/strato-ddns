@@ -20,7 +20,6 @@ SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
 # Funktion zum direkten Ausführen eines Skripts aus dem Repo
 run_remote_script() {
     local script="$1"
-    echo "$REPO_URL/$script"
     source <(wget -qO- "$REPO_URL/$script")
 }
 
