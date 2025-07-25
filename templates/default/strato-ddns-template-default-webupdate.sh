@@ -1,3 +1,4 @@
+cat > "$APP_DIR/templates/webupdate.html" <<'EOF_HTML'
 {% extends "_layout.html" %}
 
 {% block title %}Update-Ergebnis{% endblock %}
@@ -88,3 +89,4 @@
     });
 </script>
 {% endblock %}
+EOF_HTML
