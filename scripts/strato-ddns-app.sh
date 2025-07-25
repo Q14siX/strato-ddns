@@ -1,4 +1,3 @@
-cat > "$APP_DIR/app.py" <<'EOF_PY'
 # -*- coding: utf-8 -*-
 
 import base64
@@ -132,7 +131,7 @@ def get_mail_settings(config):
     return defaults
 
 def build_html_mail(subject, entries, timestamp, event, trigger):
-    """Erstellt eine HTML-Mail."""
+    """Erstellt eine HTML-Mail, die dem Web-Design nachempfunden ist."""
     try:
         dt = datetime.fromisoformat(timestamp)
         timestamp_str = dt.strftime("%d.%m.%Y - %H:%M:%S") + " Uhr"
@@ -142,11 +141,10 @@ def build_html_mail(subject, entries, timestamp, event, trigger):
     rows = ""
     for domain, ip, status in entries:
         color = "#16a34a" if status.lower().startswith(("good", "nochg")) else "#dc2626"
-        rows += f'<tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{domain}</td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">{ip}</td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color:{color}; font-weight:bold;">{status}</td></tr>'
+        rows += f'<tr><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #0078d4; font-weight: 500;"><a href="http://{domain}" target="_blank" style="color: #0078d4; text-decoration: none;">{domain}</a></td><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-family: monospace;">{ip}</td><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: {color}; font-weight: 500;">{status}</td></tr>'
 
-    return f"""
-    <!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><style>body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f3f4f6;color:#1f2937;margin:0;padding:20px;}} .container{{max-width:600px;margin:auto;background:white;padding:24px;border-radius:8px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);}} h2{{color:#0078d4;}} table{{width:100%;border-collapse:collapse;margin-top:20px;}} .footer{{font-size:12px;color:#6b7280;margin-top:24px;text-align:center;}}</style></head><body><div class="container"><h2>{subject}</h2><p><strong>Datum:</strong> {timestamp_str}<br><strong>Ereignis:</strong> {event}<br><strong>Auslöser:</strong> {trigger}</p><table><thead><tr><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">Domain</th><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">IP-Adresse</th><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;background-color:#f9fafb;">Status</th></tr></thead><tbody>{rows}</tbody></table><div class="footer">Strato DDNS Dienst</div></div></body></html>
-    """
+    return f'<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{{margin:0; padding:0; background-color:#f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";}}</style></head><body style="margin:0; padding:0; background-color:#f3f4f6;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0; background:#f3f4f6;"><tr><td align="center" style="padding:20px 0;"><table role="presentation" style="width:600px; max-width:600px; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="background-color:#0078d4; padding:16px 24px;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="color:#ffffff; font-size:20px; font-weight:bold;">Strato DDNS</td></tr></table></td></tr><tr><td style="padding:32px 24px; background-color:#ffffff;"><h1 style="font-size:24px; margin:0 0 20px 0; color:#111827;">{subject}</h1><p style="margin:0 0 12px 0; font-size:16px; line-height:24px; color:#374151;"><strong>Datum:</strong> {timestamp_str}<br><strong>Ereignis:</strong> {event}</p><table role="presentation" style="width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-spacing:0; border-radius: 8px; overflow: hidden;"><thead><tr style="background-color:#0078d4; color:#ffffff;"><th style="padding:12px 16px; text-align:left; font-size:14px;">Domain</th><th style="padding:12px 16px; text-align:left; font-size:14px;">IP-Adresse</th><th style="padding:12px 16px; text-align:left; font-size:14px;">Status</th></tr></thead><tbody>{rows}</tbody></table></td></tr><tr><td style="padding:16px 24px; background-color:#0078d4; text-align:center; color:#ffffff; font-size:14px;">© <a href="http://Q14siX.de" target="_blank" style="color:#ffffff; text-decoration:none;">Q14siX.de</a> | <a href="https://github.com/Q14siX/strato-ddns" target="_blank" style="color:#ffffff; text-decoration:none;">Projektseite auf GitHub</a></td></tr></table></td></tr></table></body></html>'
+
 
 def send_mail(config, subject, entries, timestamp, event, trigger):
     """Versendet eine E-Mail."""
@@ -503,12 +501,10 @@ def update():
     req_ip = request.args.get('myip')
     ip_list = [i.strip() for i in req_ip.split(',')] if req_ip else [get_public_ip()]
     
-    # KORREKTUR: Logik für badauth
     if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
         
-        # Log-Einträge und Mail für badauth erstellen
-        hostnames = config.get("domains", [])
+        hostnames = config.get("domains", []) or ["N/A"]
         ms = get_mail_settings(config)
         event = "Login fehlgeschlagen"
         trigger = "automatisch"
@@ -575,4 +571,3 @@ def update():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=False)
-EOF_PY
