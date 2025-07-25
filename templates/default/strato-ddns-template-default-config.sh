@@ -46,7 +46,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
             <!-- Verwaltungszugang -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingAccess">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAccess" aria-expanded="true" aria-controls="collapseAccess" style="box-shadow:none !important;outline:none !important;">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAccess" aria-expanded="true" aria-controls="collapseAccess" style="box-shadow:none !important;outline:none !important;">
                   Verwaltungszugang
                 </button>
               </h2>
@@ -74,7 +74,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
             <!-- Strato DDNS Einstellungen -->
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingStrato">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStrato" aria-expanded="false" aria-controls="collapseStrato" style="box-shadow:none !important;outline:none !important;">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStrato" aria-expanded="false" aria-controls="collapseStrato" style="box-shadow:none !important;outline:none !important;">
                   Strato DDNS
                 </button>
               </h2>
@@ -185,7 +185,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                       <input type="password" class="form-control" name="backup_password" id="backup_password" placeholder="Passwort">
                       <label for="backup_password">Passwort für Verschlüsselung</label>
                     </div>
-                    <button type="button" class="btn btn-primary" id="downloadConfigBtn">Konfiguration herunterladen</button>
+                    <button type="button" class="btn btn-primary" id="downloadConfigBtn">Sichern</button>
                   </form>
                   <hr>
                   <form id="form-restore" enctype="multipart/form-data" onsubmit="return false;">
