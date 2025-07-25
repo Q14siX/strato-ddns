@@ -1,4 +1,4 @@
-cat > "$APP_DIR/templates/config.html" <<'EOF_PY'
+cat > "$APP_DIR/app.py" <<'EOF_PY'
 # -*- coding: utf-8 -*-
 
 import base64
