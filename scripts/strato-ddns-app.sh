@@ -44,17 +44,37 @@ def prune_old_logs(root, retention_hours):
     for entry in root.findall('entry'):
         t = entry.findtext("timestamp") or ""
         try:
-            # Erlaubt beide Formate
-            if "-" in t:  # z.B. 2024-07-25 13:12:14
+            if "-" in t:
                 dt = datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
-            else:         # z.B. 25.07.2024 13:12:14
+            else:
                 dt = datetime.strptime(t, "%d.%m.%Y %H:%M:%S")
+            dt = dt.replace(tzinfo=TIMEZONE)
         except Exception:
             continue
         if (now - dt) > timedelta(hours=retention_hours):
             to_remove.append(entry)
     for entry in to_remove:
         root.remove(entry)
+
+def append_log_entries(new_entries, retention_hours):
+    from xml.etree.ElementTree import Element, SubElement, ElementTree, parse
+    now = datetime.now(TIMEZONE)
+    if os.path.exists(LOG_FILE):
+        tree = parse(LOG_FILE)
+        root = tree.getroot()
+        prune_old_logs(root, retention_hours)
+    else:
+        root = Element('log')
+        tree = ElementTree(root)
+    for timestamp, event, trigger, domain, ip, status in new_entries:
+        entry = ET.SubElement(root, 'entry')
+        ET.SubElement(entry, 'timestamp').text = timestamp
+        ET.SubElement(entry, 'event').text = event
+        ET.SubElement(entry, 'trigger').text = trigger
+        ET.SubElement(entry, 'domain').text = domain
+        ET.SubElement(entry, 'ip').text = ip
+        ET.SubElement(entry, 'status').text = status
+    tree.write(LOG_FILE, encoding='utf-8', xml_declaration=True)
 
 def log_entry(timestamp, event, trigger, domain, ip, status):
     try:
@@ -253,7 +273,6 @@ def log_page():
 @app.route('/log/download_excel', methods=['GET'])
 @login_required
 def download_log_excel():
-    # Lade Log und filtere nach Aufbewahrungszeit
     entries = []
     if os.path.exists(LOG_FILE):
         tree = ET.parse(LOG_FILE)
@@ -278,13 +297,11 @@ def download_log_excel():
                     "ip": entry.findtext("ip"),
                     "status": entry.findtext("status")
                 })
-    # Excel erzeugen
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Protokoll"
     ws.append(["Datum", "Uhrzeit", "Auslösung", "Domain", "IP-Adresse(n)", "Status"])
     for e in entries:
-        # Zerlege Zeitstempel in Datum/Uhrzeit
         dt = e["timestamp"]
         if "-" in dt:
             try:
@@ -324,7 +341,6 @@ def config_page():
         error=request.args.get("error", "")
     )
 
-# --- Bereich: Einzelne Speichern-APIs (JSON) ---
 @app.route('/config/save_strato', methods=['POST'])
 @login_required
 def save_strato():
@@ -386,7 +402,6 @@ def save_log_settings():
     save_config(config)
     return jsonify(success=True, msg="Protokoll-Aufbewahrungszeit gespeichert.")
 
-# --- Sicherung & Wiederherstellung ---
 def derive_key(password: str) -> bytes:
     return base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
 
@@ -481,6 +496,7 @@ def update():
     ip = get_public_ip()
     hostnames = config.get("domains", [])
     results = []
+    new_log_entries = []
     now = datetime.now(TIMEZONE)
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
     event = "Update"
@@ -497,7 +513,8 @@ def update():
         except Exception:
             text = "error"
         results.append((domain, ip, text))
-        log_entry(timestamp, event, trigger, domain, ip, text)
+        new_log_entries.append((timestamp, event, trigger, domain, ip, text))
+    append_log_entries(new_log_entries, get_log_retention_hours())
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, f"{event} erfolgreich")
         send_mail(config, subject, results, timestamp, event, trigger)
@@ -518,19 +535,22 @@ def auto():
     mail_settings = get_mail_settings(config)
     hostnames = config.get("domains", [])
     results = []
+    new_log_entries = []
     failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto[client_ip] if now - t < timedelta(hours=1)]
     if len(failed_attempts_auto[client_ip]) >= 5:
         for domain in hostnames:
-            log_entry(timestamp, "Sperre", trigger, domain, ",".join(ip_list), "abuse")
+            new_log_entries.append((timestamp, "Sperre", trigger, domain, ",".join(ip_list), "abuse"))
             results.append((domain, ",".join(ip_list), "abuse"))
+        append_log_entries(new_log_entries, get_log_retention_hours())
         if mail_settings.get("enabled") and mail_settings.get("notify_on_abuse"):
             subject = get_mail_subject(config, "Sperre durch Missbrauchsversuche")
             send_mail(config, subject, results, timestamp, "Sperre", trigger)
         return Response(f"abuse {ip_list[0]}", mimetype='text/plain')
     if not ip_list or not ip_list[0]:
         for domain in hostnames:
-            log_entry(timestamp, event, trigger, domain, "keine IP", "noip")
+            new_log_entries.append((timestamp, event, trigger, domain, "keine IP", "noip"))
             results.append((domain, "keine IP", "noip"))
+        append_log_entries(new_log_entries, get_log_retention_hours())
         if mail_settings.get("enabled") and mail_settings.get("notify_on_noip"):
             subject = get_mail_subject(config, "Keine IP verfügbar")
             send_mail(config, subject, results, timestamp, event, trigger)
@@ -538,8 +558,9 @@ def auto():
     if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
         for domain in hostnames:
-            log_entry(timestamp, "Login fehlgeschlagen", trigger, domain, ",".join(ip_list), "badauth-web")
+            new_log_entries.append((timestamp, "Login fehlgeschlagen", trigger, domain, ",".join(ip_list), "badauth-web"))
             results.append((domain, ",".join(ip_list), "badauth-web"))
+        append_log_entries(new_log_entries, get_log_retention_hours())
         if mail_settings.get("enabled") and mail_settings.get("notify_on_badauth"):
             subject = get_mail_subject(config, "Login fehlgeschlagen (Web)")
             send_mail(config, subject, results, timestamp, "Login fehlgeschlagen", trigger)
@@ -565,8 +586,9 @@ def auto():
                 worst = status
                 worst_ip = ip
             returned_ip = result_line.split()[1] if len(result_line.split()) > 1 else ip
-            log_entry(timestamp, event, trigger, domain, returned_ip, status)
+            new_log_entries.append((timestamp, event, trigger, domain, returned_ip, status))
             results.append((domain, returned_ip, status))
+    append_log_entries(new_log_entries, get_log_retention_hours())
     if mail_settings.get("enabled") and mail_settings.get("notify_on_success"):
         subject = get_mail_subject(config, "Update erfolgreich")
         send_mail(config, subject, results, timestamp, event, trigger)
