@@ -36,10 +36,8 @@ apt-get install -y \
   ca-certificates \
   sudo
 
-echo "== Python-Abhängigkeiten (pip) installieren =="
-pip3 install --upgrade pip
-
-pip3 install openpyxl
+echo "== Python-Abhängigkeiten installieren =="
+pip3 install --break-system-packages openpyxl
 
 mkdir -p "$APP_DIR/templates"
 
