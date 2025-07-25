@@ -67,8 +67,8 @@ echo
 echo "✅ Installation abgeschlossen: http://$SERVER_IP"
 echo
 echo "ℹ️ Verwenden Sie in der Fritz!Box eine der folgenden Update-URL´s."
-echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>"
-echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ipaddr>"
-echo "  http://$SERVER_IP/auto?username=<username>&password=<pass>&myip=<ip6addr>"
+echo "  http://$SERVER_IP/update?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>"
+echo "  http://$SERVER_IP/update?username=<username>&password=<pass>&myip=<ipaddr>"
+echo "  http://$SERVER_IP/update?username=<username>&password=<pass>&myip=<ip6addr>"
 echo
 echo "🆘 Für weitere Informationen nutzen Sie die Hilfe oder das Handbuch Ihrer Fritz!Box."
