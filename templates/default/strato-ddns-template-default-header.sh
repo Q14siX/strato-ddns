@@ -1,3 +1,4 @@
+cat > "$APP_DIR/templates/_header.html" <<'EOF_HTML'
 <header class="bg-primary text-white" x-data="{ mobileMenuOpen: false }">
     <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
@@ -39,3 +40,4 @@
         </div>
     </div>
 </header>
+EOF_HTML
