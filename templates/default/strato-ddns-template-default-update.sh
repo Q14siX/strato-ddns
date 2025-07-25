@@ -17,7 +17,7 @@ cat > "$APP_DIR/templates/update.html" <<'EOF_HTML'
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link active" href="/log">Protokoll</a></li>
+        <li class="nav-item"><a class="nav-link" href="/log">Protokoll</a></li>
         <li class="nav-item"><a class="nav-link" href="/config">Konfiguration</a></li>
       </ul>
       <ul class="navbar-nav ms-auto">
