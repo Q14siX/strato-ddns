@@ -28,3 +28,4 @@ cat > "$APP_DIR/templates/login.html" <<'EOF_HTML'
     </div>
 </div>
 {% endblock %}
+EOF_HTML
