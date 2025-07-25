@@ -49,6 +49,9 @@ while true; do
     echo "  2) 🔑 Zugangsdaten ändern"
     echo "     ➝ Ändert die Zugangsdaten für das Web-Frontend."
     echo
+    echo "  3) 🔑 System updaten"
+    echo "     ➝ Aktualisiert alle lokalen Dateien, inkl. dem Web-Frontend."
+    echo
     echo "  9) 🗑️ Deinstallieren"
     echo "     ➝ Entfernt den Dienst komplett vom System."
     echo
@@ -68,6 +71,11 @@ while true; do
             echo "🔄 Starte: Zugangsdaten ändern …"
             sleep 1
             run_remote_script "strato-ddns-credentials.sh"
+            ;;
+        3)
+            echo "🔄 Starte: Updatevorgang …"
+            sleep 1
+            run_remote_script "strato-ddns-update.sh"
             ;;
         9)
             echo "🔄 Starte: Deinstallation …"
