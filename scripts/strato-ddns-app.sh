@@ -1,3 +1,4 @@
+cat > "$APP_DIR/app.py" <<'EOF_PY'
 # -*- coding: utf-8 -*-
 
 import base64
@@ -567,7 +568,6 @@ def update():
             send_mail(config, subject, results, timestamp, "Auto-Update", "automatisch")
 
     return Response(f"{overall_status} {ip_list[0]}", mimetype='text/plain')
-
-
+EOF_PY
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=False)
