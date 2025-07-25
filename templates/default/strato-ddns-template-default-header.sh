@@ -18,6 +18,7 @@ cat > "$APP_DIR/templates/_header.html" <<'EOF_HTML'
                 <a href="{{ url_for('logout') }}" class="px-3 py-2 text-sm font-medium">Logout</a>
                 {% endif %}
             </div>
+            {% if session.logged_in %}
             <div class="-mr-2 flex md:hidden">
                 <!-- Mobile menu button -->
                 <button @click="mobileMenuOpen = !mobileMenuOpen" type="button" class="inline-flex items-center justify-center rounded-md p-2 text-white hover:bg-primary-darker focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" aria-controls="mobile-menu" aria-expanded="false">
@@ -26,18 +27,19 @@ cat > "$APP_DIR/templates/_header.html" <<'EOF_HTML'
                     <svg x-show="mobileMenuOpen" x-cloak class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
+            {% endif %}
         </div>
     </nav>
 
     <!-- Mobile menu, show/hide based on menu state. -->
+    {% if session.logged_in %}
     <div class="md:hidden" id="mobile-menu" x-show="mobileMenuOpen" x-cloak>
         <div class="space-y-1 px-2 pt-2 pb-3">
-            {% if session.logged_in %}
             <a href="{{ url_for('log_page') }}" class="block rounded-md px-3 py-2 text-base font-medium">Protokoll</a>
             <a href="{{ url_for('config_page') }}" class="block rounded-md px-3 py-2 text-base font-medium">Konfiguration</a>
             <a href="{{ url_for('logout') }}" class="block rounded-md px-3 py-2 text-base font-medium">Logout</a>
-            {% endif %}
         </div>
     </div>
+    {% endif %}
 </header>
 EOF_HTML
