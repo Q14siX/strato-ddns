@@ -49,7 +49,7 @@ while true; do
     echo "  2) 🔑 Zugangsdaten ändern"
     echo "     ➝ Ändert die Zugangsdaten für das Web-Frontend."
     echo
-    echo "  3) 🔑 System updaten"
+    echo "  3) 🔄 System updaten"
     echo "     ➝ Aktualisiert alle lokalen Dateien, inkl. dem Web-Frontend."
     echo
     echo "  9) 🗑️ Deinstallieren"
