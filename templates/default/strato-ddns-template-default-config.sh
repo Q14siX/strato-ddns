@@ -50,7 +50,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                   Verwaltungszugang
                 </button>
               </h2>
-              <div id="collapseAccess" class="accordion-collapse collapse" aria-labelledby="headingAccess" data-bs-parent="#settingsAccordion">
+              <div id="collapseAccess" class="accordion-collapse collapse show" aria-labelledby="headingAccess" data-bs-parent="#settingsAccordion">
                 <div class="accordion-body">
                   <form id="form-access" autocomplete="off">
                     <div class="form-floating mb-3">
@@ -78,7 +78,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                   Strato DDNS
                 </button>
               </h2>
-              <div id="collapseStrato" class="accordion-collapse collapse show" aria-labelledby="headingStrato" data-bs-parent="#settingsAccordion">
+              <div id="collapseStrato" class="accordion-collapse collapse" aria-labelledby="headingStrato" data-bs-parent="#settingsAccordion">
                 <div class="accordion-body">
                   <form id="form-strato" autocomplete="off">
                     <div class="form-floating mb-3">
