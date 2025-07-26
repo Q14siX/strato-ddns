@@ -46,5 +46,3 @@ wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webu
 echo "🛠️ Service-Dienste werden in Kürze neu gestartet..."
 echo "🔁 Neustart wird jetzt durchgeführt..." | tee /tmp/strato-restart.log
 nohup bash -c 'sleep 2 && systemctl daemon-reload && systemctl restart strato-ddns' >/dev/null 2>&1 &
-
-echo "🔄 Update erfolgreich abgeschlossen!"
