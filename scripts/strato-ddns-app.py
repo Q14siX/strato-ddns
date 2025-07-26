@@ -442,7 +442,10 @@ def system_update():
     def generate_output():
         script_commands = """
         set -e
+        
         export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/"
+        export APP_DIR="/opt/strato-ddns"
+        
         source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
         """.format(app_dir=BASE_DIR)
         
