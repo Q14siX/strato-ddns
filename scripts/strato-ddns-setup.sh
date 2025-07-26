@@ -51,7 +51,7 @@ echo
 run_remote_script "scripts/strato-ddns-config.sh"
 
 # ========== App und Templates einspielen ==========
-run_remote_script "$REPO_URL/scripts/strato-ddns-app.sh" "$APP_DIR/app.py"
+run_remote_script "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
 
 run_remote_script "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
 run_remote_script "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
