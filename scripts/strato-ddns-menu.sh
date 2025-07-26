@@ -75,7 +75,7 @@ while true; do
         3)
             echo "🔄 Starte: Updatevorgang …"
             sleep 1
-            run_remote_script "strato-ddns-update.sh"
+            run_remote_script "strato-ddns-webupdate.sh"
             ;;
         9)
             echo "🔄 Starte: Deinstallation …"
