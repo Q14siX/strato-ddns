@@ -44,14 +44,14 @@ echo
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
 # ========== App und Templates einspielen ==========
-wget -O "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
+wget -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
-wget -O "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
-wget -O "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
-wget -O "$REPO_URL/templates/default/config.html" "$APP_DIR/templates/config.html"
-wget -O "$REPO_URL/templates/default/log.html" "$APP_DIR/templates/log.html"
-wget -O "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
-wget -O "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
+wget -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
+wget -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
+wget -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
+wget -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
+wget -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
+wget -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
