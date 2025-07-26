@@ -1,4 +1,3 @@
-cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
 {% extends "_layout.html" %}
 
 {% block title %}Konfiguration{% endblock %}
@@ -319,4 +318,3 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
     });
 </script>
 {% endblock %}
-EOF_HTML
