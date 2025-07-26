@@ -26,12 +26,6 @@ systemctl disable strato-ddns || true
 rm -f "$SERVICE_FILE"
 systemctl daemon-reload
 
-# Funktion zum direkten Ausführen eines Skripts aus dem Repo
-run_remote_script() {
-    local script="$1"
-    source <(wget -qO- "$REPO_URL/$script")
-}
-
 echo "== System-Update & Installation benötigter Pakete =="
 apt-get update && apt-get upgrade
 apt-get install -y \
@@ -48,21 +42,17 @@ apt-get install -y \
 echo "== Python-Abhängigkeiten installieren =="
 pip3 install --break-system-packages openpyxl
 
-rm -rf "$APP_DIR/templates"
-mkdir -p "$APP_DIR/templates"
-rm "$APP_DIR/app.py"
-
 # ========== App und Templates einspielen ==========
-run_remote_script "scripts/strato-ddns-app.sh"
+wget -O "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
 
-run_remote_script "templates/default/strato-ddns-template-default-config.sh"
-run_remote_script "templates/default/strato-ddns-template-default-header.sh"
-run_remote_script "templates/default/strato-ddns-template-default-layout.sh"
-run_remote_script "templates/default/strato-ddns-template-default-log.sh"
-run_remote_script "templates/default/strato-ddns-template-default-login.sh"
-run_remote_script "templates/default/strato-ddns-template-default-webupdate.sh"
+wget -O "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
+wget -O "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
+wget -O "$REPO_URL/templates/default/config.html" "$APP_DIR/templates/config.html"
+wget -O "$REPO_URL/templates/default/log.html" "$APP_DIR/templates/log.html"
+wget -O "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
+wget -O "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
-run_remote_script "scripts/strato-ddns-service.sh"
+source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
 
 echo "✅ Update durchgeführt."
