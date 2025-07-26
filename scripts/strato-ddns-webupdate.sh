@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# =============================================
+# Strato DDNS - Updaten
+# Datei: strato-ddns-webupdate.sh
+# =============================================
+
 REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 APP_DIR="/opt/strato-ddns"
 
