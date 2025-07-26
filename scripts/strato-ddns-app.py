@@ -52,6 +52,18 @@ def save_config(config):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
 
+def initialize_app_config():
+    """Stellt sicher, dass notwendige Konfigurationen wie der Secret Key existieren."""
+    config = load_config()
+    if "secret_key" not in config or not config.get("secret_key"):
+        print("Secret Key nicht in der Konfiguration gefunden. Generiere einen neuen.")
+        config["secret_key"] = os.urandom(24).hex()
+        save_config(config)
+
+# App-Konfiguration beim Start sicherstellen
+initialize_app_config()
+
+
 def get_log_retention_hours():
     """Holt die Aufbewahrungsdauer für Logs aus der Konfiguration."""
     config = load_config()
@@ -190,7 +202,7 @@ def login_required(f):
 @app.before_request
 def setup_session():
     config = load_config()
-    app.secret_key = config.get("secret_key", os.urandom(24))
+    app.secret_key = config.get("secret_key")
 
 @app.errorhandler(RateLimitExceeded)
 def handle_ratelimit(e):
