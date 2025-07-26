@@ -20,7 +20,8 @@ SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
 # Funktion zum direkten Ausführen eines Skripts aus dem Repo
 run_remote_script() {
     local script="$1"
-    source <(wget -qO- "$REPO_URL/$script")
+    local destination="$2"
+    cat > "$destination"<<(wget -qO- "$script")
 }
 
 echo "== System-Update & Installation benötigter Pakete =="
@@ -50,14 +51,14 @@ echo
 run_remote_script "scripts/strato-ddns-config.sh"
 
 # ========== App und Templates einspielen ==========
-run_remote_script "scripts/strato-ddns-app.sh"
+run_remote_script "$REPO_URL/scripts/strato-ddns-app.sh" "$APP_DIR/app.py"
 
-run_remote_script "templates/default/strato-ddns-template-default-config.sh"
-run_remote_script "templates/default/strato-ddns-template-default-header.sh"
-run_remote_script "templates/default/strato-ddns-template-default-layout.sh"
-run_remote_script "templates/default/strato-ddns-template-default-log.sh"
-run_remote_script "templates/default/strato-ddns-template-default-login.sh"
-run_remote_script "templates/default/strato-ddns-template-default-webupdate.sh"
+run_remote_script "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
+run_remote_script "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
+run_remote_script "$REPO_URL/templates/default/config.html" "$APP_DIR/templates/config.html"
+run_remote_script "$REPO_URL/templates/default/log.html" "$APP_DIR/templates/log.html"
+run_remote_script "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
+run_remote_script "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
 run_remote_script "scripts/strato-ddns-service.sh"
