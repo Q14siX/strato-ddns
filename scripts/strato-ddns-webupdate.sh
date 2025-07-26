@@ -1,7 +1,4 @@
 #!/bin/bash
-
-export APP_DIR="{app_dir}"
-export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 set -e
 
 # ========== App einspielen ==========
