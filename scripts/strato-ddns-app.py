@@ -441,28 +441,9 @@ def api_testmail():
 def system_update():
     def generate_output():
         script_commands = """
-        export APP_DIR="{app_dir}"
-        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
         set -e
-        
-        # ========== App einspielen ==========
-        echo "🐍 Neuste Version der Applikation wird aktualisiert."
-        wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
-        
-        # ========== Templates einspielen ==========
-        echo "📄 Neuste Version des Templates wird aktualisiert."
-        wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
-        wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
-        wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
-        wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
-        wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
-        wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
-                        
-        echo "🛠️ Service-Dienste werden neu gestartet."
-        systemctl restart strato-ddns
-        
-        echo ""
-        echo "🔄 Update erfolgreich abgeschlossen!"
+        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/"
+        source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
         """.format(app_dir=BASE_DIR)
         
         process = subprocess.Popen(
