@@ -44,11 +44,7 @@ wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.ht
 wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
                 
 echo "🛠️ Service-Dienste werden in Kürze neu gestartet..."
-(
-  sleep 2
-  echo "🔁 Neustart wird jetzt durchgeführt..."
-  systemctl daemon-reload
-  systemctl restart strato-ddns
-) &
+echo "🔁 Neustart wird jetzt durchgeführt..." | tee /tmp/strato-restart.log
+nohup bash -c 'sleep 2 && systemctl daemon-reload && systemctl restart strato-ddns' >/dev/null 2>&1 &
 
 echo "🔄 Update erfolgreich abgeschlossen!"
