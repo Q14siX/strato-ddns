@@ -96,7 +96,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
             </div>
         </div>
 
-        <!-- Accordion Item: Protokoll & Backup -->
+        <!-- Accordion Item: Protokoll & Sicherung -->
         <div>
             <h2>
                 <button @click="openAccordion = openAccordion === 'system' ? '' : 'system'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
@@ -128,7 +128,7 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                 </div>
             </div>
         </div>
-
+        
         <!-- Accordion Item: Systemupdate -->
         <div>
             <h2>
@@ -138,9 +138,9 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                 </button>
             </h2>
             <div x-show="openAccordion === 'update'" class="p-5 bg-white border border-gray-200 rounded-b-md">
-                <p class="text-sm text-gray-600 mb-4">Führen Sie ein Update des Dienstes auf die neueste Version durch. Die Anwendung wird während des Updates neu gestartet.</p>
-                <div class="text-right">
-                    <button type="button" onclick="startSystemUpdate()" class="form-button bg-yellow-500 hover:bg-yellow-600">Systemupdate ausführen</button>
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-600">Führt ein Update der Anwendung auf die neueste Version von GitHub durch. Der Dienst wird danach automatisch neu gestartet.</p>
+                    <button id="systemUpdateBtn" onclick="startSystemUpdate()" class="form-button w-full">Systemupdate starten</button>
                 </div>
             </div>
         </div>
@@ -176,44 +176,61 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
     }
 
     function startSystemUpdate() {
-        const logContainerId = 'system-update-log';
-        const initialMessage = `
-            <p class="mb-2">Das Update wird ausgeführt. Bitte schließen Sie dieses Fenster nicht.</p>
-            <pre id="${logContainerId}" class="w-full h-64 p-2 bg-gray-900 text-white text-xs font-mono rounded-md overflow-y-auto"></pre>
-        `;
-        showModal(initialMessage, 'warning', 'Systemupdate läuft...', { isProcessing: true });
-
-        setTimeout(() => {
-            const logContainer = document.getElementById(logContainerId);
-            if (!logContainer) {
-                showModal('Ein interner Fehler ist aufgetreten.', 'danger');
-                return;
+        const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="max-height: 300px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
+        
+        // Modal für den Update-Fortschritt anzeigen (gelb, Button deaktiviert)
+        window.dispatchEvent(new CustomEvent('show-modal', {
+            detail: {
+                type: 'warning', // Gelb
+                title: 'Systemupdate läuft',
+                message: updateMessage,
+                onConfirm: null,
+                showCancel: false,
+                disableConfirm: true, // Button deaktiviert
+                confirmText: 'Update läuft...'
             }
-            logContainer.textContent = 'Verbindung zum Server wird hergestellt...\n';
+        }));
 
-            const evtSource = new EventSource("/api/system_update");
+        const outputPre = document.getElementById('update-output-pre');
+        const evtSource = new EventSource("{{ url_for('system_update') }}");
 
-            evtSource.onmessage = function(event) {
-                logContainer.textContent += event.data + '\n';
-                logContainer.scrollTop = logContainer.scrollHeight;
+        evtSource.onmessage = function(event) {
+            if (outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
+                outputPre.textContent = ''; // Initiale Nachricht löschen
+            }
+            outputPre.textContent += event.data + '\n';
+            outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight; // Auto-scroll
+        };
+
+        const onUpdateFinish = (success, details) => {
+            evtSource.close();
+            const finalState = {
+                showCancel: false,
+                disableConfirm: false, // Button wieder freigeben
+                onConfirm: () => window.location.reload(), // Aktion: Seite neu laden
+                confirmText: 'OK'
             };
 
-            const onFinish = (type, defaultMessage, title) => {
-                return function(event) {
-                    evtSource.close();
-                    const finalLogContent = logContainer.outerHTML;
-                    let message = event.data || defaultMessage;
-                    const finalMessage = `
-                        <p class="mb-2 font-semibold">${message}</p>
-                        ${finalLogContent}
-                    `;
-                    showModal(finalMessage, type, title, { onConfirm: () => window.location.reload() });
-                }
-            };
+            if (success) {
+                finalState.type = 'success'; // Grün
+                finalState.title = 'Update erfolgreich';
+                finalState.message = 'Die Anwendung wurde neu gestartet. Klicken Sie auf "OK", um die Seite neu zu laden.';
+            } else {
+                finalState.type = 'danger'; // Rot
+                finalState.title = 'Update fehlgeschlagen';
+                finalState.message = `Ein Fehler ist aufgetreten. Klicken Sie auf "OK", um die Seite neu zu laden.<br><br>Details: ${details || 'Keine Details verfügbar.'}`;
+            }
+            
+            // Modal mit dem finalen Status (grün/rot) aktualisieren
+            window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
+        };
 
-            evtSource.addEventListener("close", onFinish('success', 'Update erfolgreich abgeschlossen.', 'Update Abgeschlossen'));
-            evtSource.addEventListener("error", onFinish('danger', 'Ein Fehler ist aufgetreten.', 'Update Fehlgeschlagen'));
-        }, 100);
+        evtSource.addEventListener("close", (event) => onUpdateFinish(true, event.data));
+        evtSource.addEventListener("error", (event) => onUpdateFinish(false, event.data));
+        evtSource.onerror = (err) => {
+            console.error("EventSource failed:", err);
+            onUpdateFinish(false, "Verbindung zum Server verloren.");
+        };
     }
 
     document.getElementById('testMailBtn').addEventListener('click', function() {
@@ -287,5 +304,4 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
     });
 </script>
 {% endblock %}
-
 EOF_HTML
