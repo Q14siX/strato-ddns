@@ -43,14 +43,14 @@ echo "== Python-Abhängigkeiten installieren =="
 pip3 install --break-system-packages openpyxl
 
 # ========== App und Templates einspielen ==========
-wget -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
+wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
-wget -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
-wget -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
-wget -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
-wget -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
-wget -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
-wget -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
+wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
+wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
+wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
+wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
+wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
+wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
