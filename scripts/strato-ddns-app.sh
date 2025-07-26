@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import smtplib
+import subprocess
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -18,7 +19,7 @@ import openpyxl
 import requests
 from cryptography.fernet import Fernet
 from flask import (Flask, Response, flash, jsonify, redirect,
-                   render_template, request, send_file, session, url_for)
+                   render_template, request, send_file, session, url_for, stream_with_context)
 from flask_limiter import Limiter
 from flask_limiter.errors import RateLimitExceeded
 from flask_limiter.util import get_remote_address
@@ -144,7 +145,7 @@ def build_html_mail(subject, entries, timestamp, event, trigger):
         color = "#16a34a" if status.lower().startswith(("good", "nochg")) else "#dc2626"
         rows += f'<tr><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #0078d4; font-weight: 500;"><a href="http://{domain}" target="_blank" style="color: #0078d4; text-decoration: none;">{domain}</a></td><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #4b5563; font-family: monospace;">{ip}</td><td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: {color}; font-weight: 500;">{status}</td></tr>'
 
-    return f'<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{{margin:0; padding:0; background-color:#f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";}}</style></head><body style="margin:0; padding:0; background-color:#f3f4f6;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0; background:#f3f4f6;"><tr><td align="center" style="padding:20px 0;"><table role="presentation" style="width:600px; max-width:600px; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="background-color:#0078d4; padding:16px 24px;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="color:#ffffff; font-size:20px; font-weight:bold;">Strato DDNS</td></tr></table></td></tr><tr><td style="padding:32px 24px; background-color:#ffffff;"><h1 style="font-size:24px; margin:0 0 20px 0; color:#111827;">{subject}</h1><p style="margin:0 0 12px 0; font-size:16px; line-height:24px; color:#374151;"><strong>Datum:</strong> {timestamp_str}<br><strong>Ereignis:</strong> {event}</p><table role="presentation" style="width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-spacing:0; border-radius: 8px; overflow: hidden;"><thead><tr style="background-color:#0078d4; color:#ffffff;"><th style="padding:12px 16px; text-align:left; font-size:14px;">Domain</th><th style="padding:12px 16px; text-align:left; font-size:14px;">IP-Adresse</th><th style="padding:12px 16px; text-align:left; font-size:14px;">Status</th></tr></thead><tbody>{rows}</tbody></table></td></tr><tr><td style="padding:16px 24px; background-color:#0078d4; text-align:center; color:#ffffff; font-size:14px;">© <a href="http://Q14siX.de" target="_blank" style="color:#ffffff; text-decoration:none;">Q14siX.de</a> | <a href="https://github.com/Q14siX/strato-ddns" target="_blank" style="color:#ffffff; text-decoration:none;">Projektseite auf GitHub</a></td></tr></table></td></tr></table></body></html>'
+    return f'<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{{margin:0; padding:0; background-color:#f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";}}</style></head><body style="margin:0; padding:0; background-color:#f3f4f6;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0; background:#f3f4f6;"><tr><td align="center" style="padding:20px 0;"><table role="presentation" style="width:600px; max-width:600px; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="background-color:#0078d4; padding:16px 24px;"><table role="presentation" style="width:100%; border-collapse:collapse; border:0; border-spacing:0;"><tr><td style="color:#ffffff; font-size:20px; font-weight:bold;">Strato DDNS</td></tr></table></td></tr><tr><td style="padding:32px 24px; background-color:#ffffff;"><h1 style="font-size:24px; margin:0 0 20px 0; color:#111827;">{subject}</h1><p style="margin:0 0 12px 0; font-size:16px; line-height:24px; color:#374151;"><strong>Datum:</strong> {timestamp_str}<br><strong>Ereignis:</strong> {event}<br><strong>Auslöser:</strong> {trigger}</p><table role="presentation" style="width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-spacing:0; border-radius: 8px; overflow: hidden;"><thead><tr style="background-color:#0078d4; color:#ffffff;"><th style="padding:12px 16px; text-align:left; font-size:14px;">Domain</th><th style="padding:12px 16px; text-align:left; font-size:14px;">IP-Adresse</th><th style="padding:12px 16px; text-align:left; font-size:14px;">Status</th></tr></thead><tbody>{rows}</tbody></table></td></tr><tr><td style="padding:16px 24px; background-color:#0078d4; text-align:center; color:#ffffff; font-size:14px;">© <a href="http://Q14siX.de" target="_blank" style="color:#ffffff; text-decoration:none;">Q14siX.de</a> | <a href="https://github.com/Q14siX/strato-ddns" target="_blank" style="color:#ffffff; text-decoration:none;">Projektseite auf GitHub</a></td></tr></table></td></tr></table></body></html>'
 
 
 def send_mail(config, subject, entries, timestamp, event, trigger):
@@ -436,6 +437,61 @@ def api_testmail():
     else:
         return jsonify(success=False, message=info), 500
 
+@app.route('/api/system_update')
+@login_required
+def system_update():
+    def generate_output():
+        # KORREKTUR: Umgebungsvariablen für die Sub-Skripte setzen
+        script_commands = """
+        export APP_DIR="{app_dir}"
+        export SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
+        set -e
+        echo "Starte Systemupdate..."
+        REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
+        
+        echo "Aktualisiere app.py..."
+        wget -qO- "$REPO_URL/scripts/strato-ddns-app.sh" | bash
+        echo "app.py aktualisiert."
+        
+        echo "Aktualisiere Templates..."
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-config.sh" | bash
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-header.sh" | bash
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-layout.sh" | bash
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-log.sh" | bash
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-login.sh" | bash
+        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-webupdate.sh" | bash
+        echo "Templates aktualisiert."
+        
+        echo "Aktualisiere und starte Service neu..."
+        wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh" | bash
+        echo "Service neu gestartet."
+        
+        echo ""
+        echo "Update abgeschlossen!"
+        """.format(app_dir=BASE_DIR)
+        
+        process = subprocess.Popen(
+            ['bash', '-c', script_commands],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        for line in iter(process.stdout.readline, ''):
+            yield f"data: {line.strip()}\n\n"
+            
+        process.wait()
+        
+        if process.returncode == 0:
+            yield "event: close\ndata: Update erfolgreich abgeschlossen.\n\n"
+        else:
+            yield f"event: error\ndata: Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
+
+    return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
+
+
 @app.route('/log/download_excel')
 @login_required
 def download_log_excel():
@@ -568,6 +624,7 @@ def update():
             send_mail(config, subject, results, timestamp, "Auto-Update", "automatisch")
 
     return Response(f"{overall_status} {ip_list[0]}", mimetype='text/plain')
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=False)
