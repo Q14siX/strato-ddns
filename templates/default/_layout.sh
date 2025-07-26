@@ -1,4 +1,3 @@
-cat > "$APP_DIR/templates/_layout.html" <<'EOF_HTML'
 <!DOCTYPE html>
 <html lang="de" class="h-full bg-gray-100">
 <head>
@@ -197,4 +196,3 @@ cat > "$APP_DIR/templates/_layout.html" <<'EOF_HTML'
     {% block scripts %}{% endblock %}
 </body>
 </html>
-EOF_HTML
