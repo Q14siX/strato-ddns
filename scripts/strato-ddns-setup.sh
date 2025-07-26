@@ -43,10 +43,12 @@ echo
 # ====== config.json erstellen über ausgelagertes Skript ======
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
-# ========== App und Templates einspielen ==========
-echo "📄 Template wird installiert"
+# ========== App einspielen ==========
+echo "🐍 Applikation wird installiert"
 wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
+# ========== Templates einspielen ==========
+echo "📄 Template wird installiert"
 wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
 wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
 wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
