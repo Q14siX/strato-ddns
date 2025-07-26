@@ -215,18 +215,18 @@
                 const finalState = {
                     showCancel: false,
                     disableConfirm: false, // Button wieder freigeben
-                    onConfirm: () => window.location.reload(), // Aktion: Seite neu laden
+                    onConfirm: () => window.location.replace(window.location.href), // Aktion: Seite neu laden
                     confirmText: 'OK'
                 };
 
                 if (success) {
                     finalState.type = 'success'; // Grün
                     finalState.title = 'Update erfolgreich';
-                    finalOutputPre.textContent += '\n--- Update erfolgreich abgeschlossen ---\n';
+                    finalOutputPre.textContent += '\n🔄 Update erfolgreich abgeschlossen\n';
                 } else {
                     finalState.type = 'danger'; // Rot
                     finalState.title = 'Update fehlgeschlagen';
-                    finalOutputPre.textContent += `\n--- Update fehlgeschlagen ---\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
+                    finalOutputPre.textContent += `\n🛑 Update fehlgeschlagen\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
                 }
                 
                 finalOutputPre.parentElement.scrollTop = finalOutputPre.parentElement.scrollHeight;
