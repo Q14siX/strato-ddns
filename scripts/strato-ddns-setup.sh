@@ -44,7 +44,7 @@ echo
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
 # ========== App und Templates einspielen ==========
-run_remote_script "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
+wget -O "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
 
 wget -O "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
 wget -O "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
@@ -54,7 +54,7 @@ wget -O "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
 wget -O "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
-bash <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
+source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
