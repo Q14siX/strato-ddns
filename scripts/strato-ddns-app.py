@@ -440,33 +440,37 @@ def api_testmail():
 @login_required
 def system_update():
     def generate_output():
-        # KORREKTUR: Umgebungsvariablen für die Sub-Skripte setzen
         script_commands = """
         export APP_DIR="{app_dir}"
-        export SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
+        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
         set -e
-        echo "Starte Systemupdate..."
-        REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
         
-        echo "Aktualisiere app.py..."
-        wget -qO- "$REPO_URL/scripts/strato-ddns-app.sh" | bash
-        echo "app.py aktualisiert."
+        # ========== App einspielen ==========
+        echo "🐍 Neuste Version der Applikation wird installiert."
+        wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
         
-        echo "Aktualisiere Templates..."
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-config.sh" | bash
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-header.sh" | bash
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-layout.sh" | bash
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-log.sh" | bash
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-login.sh" | bash
-        wget -qO- "$REPO_URL/templates/default/strato-ddns-template-default-webupdate.sh" | bash
-        echo "Templates aktualisiert."
+        # ========== Templates einspielen ==========
+        echo "📄 Neuste Version des Templates wird installiert."
+        wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
+        wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
+        wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
+        wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
+        wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
+        wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
         
-        echo "Aktualisiere und starte Service neu..."
-        wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh" | bash
+        echo "🔄 Applikation und Templates aktualisiert."
+        
+        echo "========== Systemd-Service wird eingespielt =========="
+        source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
+        echo "Service-Datei aktualisiert."
+        
+        echo "Lade systemd neu und starte den Service..."
+        systemctl daemon-reload
+        systemctl enable --now strato-ddns
         echo "Service neu gestartet."
         
         echo ""
-        echo "Update abgeschlossen!"
+        echo "Update erfolgreich abgeschlossen!"
         """.format(app_dir=BASE_DIR)
         
         process = subprocess.Popen(
