@@ -466,7 +466,7 @@ def system_update():
         if process.returncode == 0:
             yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen!\n\n"
         else:
-            yield f"event: error\ndata: Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
+            yield f"event: error\ndata: 🛑 Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
 
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
