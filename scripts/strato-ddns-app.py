@@ -448,7 +448,6 @@ def system_update():
         # ========== App einspielen ==========
         echo "🐍 Neuste Version der Applikation wird aktualisiert."
         wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
-        echo "   Applikation aktualisiert."
         
         # ========== Templates einspielen ==========
         echo "📄 Neuste Version des Templates wird aktualisiert."
@@ -458,12 +457,9 @@ def system_update():
         wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
         wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
         wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
-        echo "   Templates aktualisiert."
                         
         echo "📦 Service-Dienste werden neu gestartet."
-        systemctl daemon-reload
-        systemctl enable --now strato-ddns
-        echo "   Neustart abgeschlossen."
+        systemctl restart strato-ddns
         
         echo ""
         echo "🔄 Update erfolgreich abgeschlossen!"
