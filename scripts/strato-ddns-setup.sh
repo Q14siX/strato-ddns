@@ -61,7 +61,7 @@ run_remote_script "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/l
 run_remote_script "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
-run_remote_script "scripts/strato-ddns-service.sh"
+bash "$REPO_URL/scripts/strato-ddns-service.sh"
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
