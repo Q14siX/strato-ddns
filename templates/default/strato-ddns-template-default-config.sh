@@ -176,7 +176,8 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
     }
 
     function startSystemUpdate() {
-        const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="max-height: 300px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
+        // Die schwarze Box mit fester Höhe und Scroll-Verhalten
+        const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
         
         // Modal für den Update-Fortschritt anzeigen (gelb, Button deaktiviert)
         window.dispatchEvent(new CustomEvent('show-modal', {
@@ -191,38 +192,52 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
             }
         }));
 
-        const outputPre = document.getElementById('update-output-pre');
         const evtSource = new EventSource("{{ url_for('system_update') }}");
 
         evtSource.onmessage = function(event) {
-            if (outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
+            const outputPre = document.getElementById('update-output-pre');
+            if (outputPre && outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
                 outputPre.textContent = ''; // Initiale Nachricht löschen
             }
-            outputPre.textContent += event.data + '\n';
-            outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight; // Auto-scroll
+            if (outputPre) {
+                outputPre.textContent += event.data + '\n';
+                outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight; // Auto-scroll
+            }
         };
 
         const onUpdateFinish = (success, details) => {
             evtSource.close();
-            const finalState = {
-                showCancel: false,
-                disableConfirm: false, // Button wieder freigeben
-                onConfirm: () => window.location.reload(), // Aktion: Seite neu laden
-                confirmText: 'OK'
-            };
-
-            if (success) {
-                finalState.type = 'success'; // Grün
-                finalState.title = 'Update erfolgreich';
-                finalState.message = 'Die Anwendung wurde neu gestartet. Klicken Sie auf "OK", um die Seite neu zu laden.';
-            } else {
-                finalState.type = 'danger'; // Rot
-                finalState.title = 'Update fehlgeschlagen';
-                finalState.message = `Ein Fehler ist aufgetreten. Klicken Sie auf "OK", um die Seite neu zu laden.<br><br>Details: ${details || 'Keine Details verfügbar.'}`;
-            }
             
-            // Modal mit dem finalen Status (grün/rot) aktualisieren
-            window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
+            // Warten bis das Modal-Element sicher im DOM ist
+            setTimeout(() => {
+                const finalOutputPre = document.getElementById('update-output-pre');
+                if (!finalOutputPre) return;
+
+                const finalState = {
+                    showCancel: false,
+                    disableConfirm: false, // Button wieder freigeben
+                    onConfirm: () => window.location.reload(), // Aktion: Seite neu laden
+                    confirmText: 'OK'
+                };
+
+                if (success) {
+                    finalState.type = 'success'; // Grün
+                    finalState.title = 'Update erfolgreich';
+                    finalOutputPre.textContent += '\n--- Update erfolgreich abgeschlossen ---\n';
+                } else {
+                    finalState.type = 'danger'; // Rot
+                    finalState.title = 'Update fehlgeschlagen';
+                    finalOutputPre.textContent += `\n--- Update fehlgeschlagen ---\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
+                }
+                
+                finalOutputPre.parentElement.scrollTop = finalOutputPre.parentElement.scrollHeight;
+                
+                // Behalte den Log bei und update nur den "Rahmen" des Modals
+                finalState.message = finalOutputPre.parentElement.outerHTML;
+
+                // Modal mit dem finalen Status (grün/rot) und aktiviertem Button aktualisieren
+                window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
+            }, 100); // Kurze Verzögerung zur Sicherheit
         };
 
         evtSource.addEventListener("close", (event) => onUpdateFinish(true, event.data));
