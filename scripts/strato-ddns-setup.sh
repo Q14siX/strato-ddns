@@ -17,13 +17,6 @@ REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 APP_DIR="/opt/strato-ddns"
 SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
 
-# Funktion zum direkten Ausführen eines Skripts aus dem Repo
-run_remote_script() {
-    local github="$1"
-    local local="$2"
-    wget -O "$local" "$github"
-}
-
 echo "== System-Update & Installation benötigter Pakete =="
 apt-get update -y && apt-get upgrade -y
 apt-get install -y \
@@ -48,17 +41,17 @@ read -s -p "Passwort: " WEBPASS
 echo
 
 # ====== config.json erstellen über ausgelagertes Skript ======
-run_remote_script "scripts/strato-ddns-config.sh"
+source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
 # ========== App und Templates einspielen ==========
 run_remote_script "$REPO_URL/scripts/strato-ddns-app.py" "$APP_DIR/app.py"
 
-run_remote_script "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
-run_remote_script "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
-run_remote_script "$REPO_URL/templates/default/config.html" "$APP_DIR/templates/config.html"
-run_remote_script "$REPO_URL/templates/default/log.html" "$APP_DIR/templates/log.html"
-run_remote_script "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
-run_remote_script "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
+wget -O "$REPO_URL/templates/default/_header.html" "$APP_DIR/templates/_header.html"
+wget -O "$REPO_URL/templates/default/_layout.html" "$APP_DIR/templates/_layout.html"
+wget -O "$REPO_URL/templates/default/config.html" "$APP_DIR/templates/config.html"
+wget -O "$REPO_URL/templates/default/log.html" "$APP_DIR/templates/log.html"
+wget -O "$REPO_URL/templates/default/login.html" "$APP_DIR/templates/login.html"
+wget -O "$REPO_URL/templates/default/webupdate.html" "$APP_DIR/templates/webupdate.html"
 
 # ========== Systemd-Service einspielen ==========
 bash <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
