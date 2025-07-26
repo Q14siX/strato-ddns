@@ -443,7 +443,7 @@ def system_update():
         script_commands = """
         set -e
         
-        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main/"
+        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
         export APP_DIR="/opt/strato-ddns"
         
         source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
