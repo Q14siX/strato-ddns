@@ -44,6 +44,7 @@ echo
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
 # ========== App und Templates einspielen ==========
+echo "📄 Template wird installiert"
 wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
 wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
