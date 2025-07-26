@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
+APP_DIR="/opt/strato-ddns"
+
 echo "🐍 Neuste Version der Applikation wird aktualisiert."
 wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
