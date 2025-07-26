@@ -464,7 +464,7 @@ def system_update():
         process.wait()
         
         if process.returncode == 0:
-            yield "event: close\ndata: Update erfolgreich abgeschlossen.\n\n"
+            yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen!\n\n"
         else:
             yield f"event: error\ndata: Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
 
