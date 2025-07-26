@@ -60,9 +60,11 @@ echo "🔧 Service erstellen und starten..."
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
+echo "✅ Installation abgeschlossen...
 echo
-echo "✅ Installation abgeschlossen: http://$SERVER_IP"
 echo
+echo "🟢 Starten Sie Ihren Browser und rufen Sie das Webfrontend auf."
+echo "  http://$SERVER_IP
 echo "ℹ️ Verwenden Sie in der Fritz!Box eine der folgenden Update-URL´s."
 echo "  http://$SERVER_IP/update?username=<username>&password=<pass>&myip=<ipaddr>,<ip6addr>"
 echo "  http://$SERVER_IP/update?username=<username>&password=<pass>&myip=<ipaddr>"
