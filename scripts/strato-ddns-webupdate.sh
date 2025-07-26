@@ -13,9 +13,3 @@ wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.
 wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
 wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
 wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
-                
-echo "🛠️ Service-Dienste werden neu gestartet."
-systemctl restart strato-ddns
-
-echo ""
-echo "🔄 Update erfolgreich abgeschlossen!"
