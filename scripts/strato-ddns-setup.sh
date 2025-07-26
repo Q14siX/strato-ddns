@@ -17,9 +17,11 @@ REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
 APP_DIR="/opt/strato-ddns"
 SERVICE_FILE="/etc/systemd/system/strato-ddns.service"
 
-echo "== System-Update & Installation benötigter Pakete =="
-apt-get update -y && apt-get upgrade -y
-apt-get install -y \
+echo "🔄 Betriebssystem updaten..."
+apt-get update -qq 2>&1 >/dev/null && apt-get upgrade -qq 2>&1 >/dev/null
+
+echo "📦 Pakete ggf. installieren..."
+apt-get install -yqq \
   python3 \
   python3-pip \
   python3-flask \
@@ -30,25 +32,23 @@ apt-get install -y \
   ca-certificates \
   sudo
 
-echo "== Python-Abhängigkeiten installieren =="
-pip3 install --break-system-packages openpyxl
+echo "🐍 Python Abhängigkeiten ggf. nachinstallieren..."
+pip3 install --break-system-packages --quiet openpyxl
 
+echo "📂 Templateverzeichnis erstellen..."
 mkdir -p "$APP_DIR/templates"
 
-echo "[+] Zugangsdaten für Web-Login festlegen:"
+echo "👤 Zugangsdaten für Web-Login festlegen..."
 read -p "Benutzername: " WEBUSER
 read -s -p "Passwort: " WEBPASS
-echo
 
-# ====== config.json erstellen über ausgelagertes Skript ======
+echo "🛠️ Konfigurationsdatei schreiben..."
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-config.sh")
 
-# ========== App einspielen ==========
-echo "🐍 Applikation wird installiert"
+echo "🖥️ Applikation installieren..."
 wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
 
-# ========== Templates einspielen ==========
-echo "📄 Template wird installiert"
+echo "📄 Template installieren..."
 wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
 wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
 wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
@@ -56,7 +56,7 @@ wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
 wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
 wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
 
-# ========== Systemd-Service einspielen ==========
+echo "🔧 Service erstellen und starten..."
 source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
