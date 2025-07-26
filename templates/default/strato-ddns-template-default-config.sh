@@ -181,14 +181,12 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
             <p class="mb-2">Das Update wird ausgeführt. Bitte schließen Sie dieses Fenster nicht.</p>
             <pre id="${logContainerId}" class="w-full h-64 p-2 bg-gray-900 text-white text-xs font-mono rounded-md overflow-y-auto"></pre>
         `;
-        showModal(initialMessage, 'warning', 'Systemupdate läuft...');
+        showModal(initialMessage, 'warning', 'Systemupdate läuft...', { isProcessing: true });
 
-        // Warten Sie einen kurzen Moment, damit das Modal im DOM gerendert wird
         setTimeout(() => {
             const logContainer = document.getElementById(logContainerId);
             if (!logContainer) {
-                console.error("Log container not found in modal.");
-                showModal('Ein interner Fehler ist aufgetreten: Log-Fenster konnte nicht initialisiert werden.', 'danger');
+                showModal('Ein interner Fehler ist aufgetreten.', 'danger');
                 return;
             }
             logContainer.textContent = 'Verbindung zum Server wird hergestellt...\n';
@@ -200,34 +198,22 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                 logContainer.scrollTop = logContainer.scrollHeight;
             };
 
-            evtSource.addEventListener("close", function(event) {
-                evtSource.close();
-                const finalLogContent = logContainer.outerHTML;
-                let successMessage = 'Update erfolgreich abgeschlossen.';
-                if (event.data) {
-                    successMessage = event.data;
+            const onFinish = (type, defaultMessage, title) => {
+                return function(event) {
+                    evtSource.close();
+                    const finalLogContent = logContainer.outerHTML;
+                    let message = event.data || defaultMessage;
+                    const finalMessage = `
+                        <p class="mb-2 font-semibold">${message}</p>
+                        ${finalLogContent}
+                    `;
+                    showModal(finalMessage, type, title, { onConfirm: () => window.location.reload() });
                 }
-                const finalMessage = `
-                    <p class="mb-2 font-semibold text-green-700">${successMessage}</p>
-                    ${finalLogContent}
-                `;
-                showModal(finalMessage, 'success', 'Update Abgeschlossen');
-            });
-            
-            evtSource.addEventListener("error", function(event) {
-                evtSource.close();
-                const finalLogContent = logContainer.outerHTML;
-                let errorMessage = 'Ein Fehler ist aufgetreten.';
-                if (event.data) {
-                    errorMessage = event.data;
-                }
-                 const finalMessage = `
-                    <p class="mb-2 font-semibold text-red-700">${errorMessage}</p>
-                    ${finalLogContent}
-                `;
-                showModal(finalMessage, 'danger', 'Update Fehlgeschlagen');
-            });
-        }, 100); // 100ms Verzögerung
+            };
+
+            evtSource.addEventListener("close", onFinish('success', 'Update erfolgreich abgeschlossen.', 'Update Abgeschlossen'));
+            evtSource.addEventListener("error", onFinish('danger', 'Ein Fehler ist aufgetreten.', 'Update Fehlgeschlagen'));
+        }, 100);
     }
 
     document.getElementById('testMailBtn').addEventListener('click', function() {
@@ -301,4 +287,5 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
     });
 </script>
 {% endblock %}
+
 EOF_HTML
