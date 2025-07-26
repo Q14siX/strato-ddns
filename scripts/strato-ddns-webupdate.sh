@@ -52,5 +52,3 @@ echo "🛠️ Service-Dienste werden in Kürze neu gestartet..."
 ) &
 
 echo "🔄 Update erfolgreich abgeschlossen!"
-
-echo "🔄 Update erfolgreich abgeschlossen!"
