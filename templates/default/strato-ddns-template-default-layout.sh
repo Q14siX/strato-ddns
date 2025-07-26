@@ -80,6 +80,7 @@ cat > "$APP_DIR/templates/_layout.html" <<'EOF_HTML'
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
             opacity: 1;
         }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
@@ -98,14 +99,24 @@ cat > "$APP_DIR/templates/_layout.html" <<'EOF_HTML'
     </footer>
 
     <!-- Globales Modal-Fenster -->
-    <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true }"
-         @show-modal.window="show = true; type = $event.detail.type; title = $event.detail.title; message = $event.detail.message; confirmCallback = $event.detail.onConfirm; showCancel = $event.detail.showCancel"
+    <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '' }"
+         @show-modal.window="
+            show = true;
+            // Nur Eigenschaften aktualisieren, die im Event vorhanden sind
+            if ($event.detail.type !== undefined) type = $event.detail.type;
+            if ($event.detail.title !== undefined) title = $event.detail.title;
+            if ($event.detail.message !== undefined) message = $event.detail.message;
+            if ($event.detail.onConfirm !== undefined) confirmCallback = $event.detail.onConfirm;
+            if ($event.detail.showCancel !== undefined) showCancel = $event.detail.showCancel;
+            confirmDisabled = $event.detail.disableConfirm || false;
+            confirmText = $event.detail.confirmText || '';
+         "
          x-show="show"
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
          aria-labelledby="modal-title" role="dialog" aria-modal="true">
         
-        <div @click.away="show = false" 
+        <div @click.away="if (!confirmDisabled) show = false" 
              x-show="show"
              x-transition:enter="ease-out duration-300"
              x-transition:enter-start="opacity-0 scale-95"
@@ -131,8 +142,17 @@ cat > "$APP_DIR/templates/_layout.html" <<'EOF_HTML'
                         Abbrechen
                     </button>
                 </template>
-                <button @click="if (confirmCallback) { confirmCallback(); } show = false;" type="button" class="form-button" :class="{'bg-red-600 hover:bg-red-700': type === 'confirm_danger', 'bg-primary hover:bg-primary-darker': type !== 'confirm_danger'}" x-text="confirmCallback ? 'Ja, ausführen' : 'OK'">
-                    OK
+                <button 
+                    @click="if (confirmCallback) { confirmCallback(); } if (!confirmCallback) { show = false; }" 
+                    type="button" 
+                    class="form-button"
+                    :disabled="confirmDisabled"
+                    :class="{
+                        'bg-red-600 hover:bg-red-700': type === 'confirm_danger', 
+                        'bg-primary hover:bg-primary-darker': type !== 'confirm_danger',
+                        'bg-gray-400 cursor-not-allowed': confirmDisabled
+                    }"
+                    x-text="confirmText || (confirmCallback ? 'Ja, ausführen' : 'OK')">
                 </button>
             </div>
         </div>
