@@ -458,7 +458,7 @@ def system_update():
         wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
         wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
                         
-        echo "📦 Service-Dienste werden neu gestartet."
+        echo "🛠️ Service-Dienste werden neu gestartet."
         systemctl restart strato-ddns
         
         echo ""
