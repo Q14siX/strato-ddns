@@ -128,6 +128,23 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
                 </div>
             </div>
         </div>
+
+        <!-- Accordion Item: Systemupdate -->
+        <div>
+            <h2>
+                <button @click="openAccordion = openAccordion === 'update' ? '' : 'update'" type="button" class="accordion-button flex items-center justify-between w-full p-4 font-medium text-left text-white rounded-md focus:outline-none">
+                    <span>Systemupdate</span>
+                    <svg :class="{'rotate-180': openAccordion === 'update'}" class="w-5 h-5 shrink-0 transition-transform duration-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+            </h2>
+            <div x-show="openAccordion === 'update'" class="p-5 bg-white border border-gray-200 rounded-b-md">
+                <p class="text-sm text-gray-600 mb-4">Führen Sie ein Update des Dienstes auf die neueste Version durch. Die Anwendung wird während des Updates neu gestartet.</p>
+                <div class="text-right">
+                    <button type="button" onclick="startSystemUpdate()" class="form-button bg-yellow-500 hover:bg-yellow-600">Systemupdate ausführen</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}
@@ -156,6 +173,61 @@ cat > "$APP_DIR/templates/config.html" <<'EOF_HTML'
         setTimeout(() => {
             window.location.href = "{{ url_for('webupdate_page') }}";
         }, 1500); // 1.5 Sekunden Verzögerung
+    }
+
+    function startSystemUpdate() {
+        const logContainerId = 'system-update-log';
+        const initialMessage = `
+            <p class="mb-2">Das Update wird ausgeführt. Bitte schließen Sie dieses Fenster nicht.</p>
+            <pre id="${logContainerId}" class="w-full h-64 p-2 bg-gray-900 text-white text-xs font-mono rounded-md overflow-y-auto"></pre>
+        `;
+        showModal(initialMessage, 'warning', 'Systemupdate läuft...');
+
+        // Warten Sie einen kurzen Moment, damit das Modal im DOM gerendert wird
+        setTimeout(() => {
+            const logContainer = document.getElementById(logContainerId);
+            if (!logContainer) {
+                console.error("Log container not found in modal.");
+                showModal('Ein interner Fehler ist aufgetreten: Log-Fenster konnte nicht initialisiert werden.', 'danger');
+                return;
+            }
+            logContainer.textContent = 'Verbindung zum Server wird hergestellt...\n';
+
+            const evtSource = new EventSource("/api/system_update");
+
+            evtSource.onmessage = function(event) {
+                logContainer.textContent += event.data + '\n';
+                logContainer.scrollTop = logContainer.scrollHeight;
+            };
+
+            evtSource.addEventListener("close", function(event) {
+                evtSource.close();
+                const finalLogContent = logContainer.outerHTML;
+                let successMessage = 'Update erfolgreich abgeschlossen.';
+                if (event.data) {
+                    successMessage = event.data;
+                }
+                const finalMessage = `
+                    <p class="mb-2 font-semibold text-green-700">${successMessage}</p>
+                    ${finalLogContent}
+                `;
+                showModal(finalMessage, 'success', 'Update Abgeschlossen');
+            });
+            
+            evtSource.addEventListener("error", function(event) {
+                evtSource.close();
+                const finalLogContent = logContainer.outerHTML;
+                let errorMessage = 'Ein Fehler ist aufgetreten.';
+                if (event.data) {
+                    errorMessage = event.data;
+                }
+                 const finalMessage = `
+                    <p class="mb-2 font-semibold text-red-700">${errorMessage}</p>
+                    ${finalLogContent}
+                `;
+                showModal(finalMessage, 'danger', 'Update Fehlgeschlagen');
+            });
+        }, 100); // 100ms Verzögerung
     }
 
     document.getElementById('testMailBtn').addEventListener('click', function() {
