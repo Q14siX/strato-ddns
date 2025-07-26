@@ -14,7 +14,7 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo "🔄 Systemupdate..."
+echo "🔄 Betriebssystem updaten..."
 apt-get update -qq 2>&1 >/dev/null && apt-get upgrade -qq 2>&1 >/dev/null
 
 echo "📦 Pakete ggf. nachinstallieren..."
