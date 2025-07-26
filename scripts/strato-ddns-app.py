@@ -446,31 +446,27 @@ def system_update():
         set -e
         
         # ========== App einspielen ==========
-        echo "🐍 Neuste Version der Applikation wird installiert."
+        echo "🐍 Neuste Version der Applikation wird aktualisiert."
         wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
+        echo "   Applikation aktualisiert."
         
         # ========== Templates einspielen ==========
-        echo "📄 Neuste Version des Templates wird installiert."
+        echo "📄 Neuste Version des Templates wird aktualisiert."
         wget -q -O "$APP_DIR/templates/_header.html" "$REPO_URL/templates/default/_header.html"
         wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layout.html"
         wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
         wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
         wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
         wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
-        
-        echo "🔄 Applikation und Templates aktualisiert."
-        
-        echo "========== Systemd-Service wird eingespielt =========="
-        source <(wget -qO- "$REPO_URL/scripts/strato-ddns-service.sh")
-        echo "Service-Datei aktualisiert."
-        
-        echo "Lade systemd neu und starte den Service..."
+        echo "   Templates aktualisiert."
+                        
+        echo "📦 Service-Dienste werden neu gestartet."
         systemctl daemon-reload
         systemctl enable --now strato-ddns
-        echo "Service neu gestartet."
+        echo "   Neustart abgeschlossen."
         
         echo ""
-        echo "Update erfolgreich abgeschlossen!"
+        echo "🔄 Update erfolgreich abgeschlossen!"
         """.format(app_dir=BASE_DIR)
         
         process = subprocess.Popen(
