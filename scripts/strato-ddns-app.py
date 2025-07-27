@@ -495,10 +495,8 @@ def system_update():
         
         if process.returncode == 0:
             session.clear()
-            # ÄNDERUNG: Die formatierte Erfolgsmeldung wird jetzt hier generiert.
             yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
         else:
-            # ÄNDERUNG: Die formatierte Fehlermeldung wird jetzt hier generiert und über ein benutzerdefiniertes Event gesendet.
             details = f"Prozess endete mit Fehlercode {process.returncode}."
             yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
 
