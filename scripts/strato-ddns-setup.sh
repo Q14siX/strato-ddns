@@ -33,7 +33,7 @@ apt-get install -yqq \
   sudo
 
 echo "🐍 Python Abhängigkeiten ggf. nachinstallieren..."
-pip3 install --break-system-packages --quiet openpyxl
+pip3 install --break-system-packages --quiet --root-user-action=ignore openpyxl
 
 echo "📂 Templateverzeichnis erstellen..."
 mkdir -p "$APP_DIR/templates"
