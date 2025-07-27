@@ -16,7 +16,6 @@
                 </button>
             </h2>
             <div x-show="openAccordion === 'access'" class="p-5 bg-white border border-gray-200 rounded-b-md">
-                <!-- ÄNDERUNG: Formular sendet direkt an den Backend-Endpunkt. -->
                 <form id="form-access" action="{{ url_for('api_save_access') }}" method="POST" class="space-y-4">
                     <div>
                         <label for="new_webuser" class="block text-sm font-medium text-gray-700">Neuer Benutzername</label>
@@ -31,7 +30,6 @@
                         <input type="password" name="confirm_webpass" id="confirm_webpass" class="input-field" placeholder="••••••••">
                     </div>
                     <div class="text-right">
-                        <!-- ÄNDERUNG: Standard-Submit-Button ohne onclick. -->
                         <button type="submit" class="form-button">Speichern</button>
                     </div>
                 </form>
@@ -47,7 +45,6 @@
                 </button>
             </h2>
             <div x-show="openAccordion === 'strato'" class="p-5 bg-white border border-gray-200 rounded-b-md">
-                <!-- ÄNDERUNG: Formular sendet direkt an den Backend-Endpunkt. -->
                 <form id="form-strato" action="{{ url_for('api_save_strato') }}" method="POST" class="space-y-4">
                     <div>
                         <label for="username" class="block text-sm font-medium text-gray-700">Strato Domain-Inhaber</label>
@@ -62,7 +59,6 @@
                         <textarea name="domains" id="domains" rows="5" class="input-field">{{ domains }}</textarea>
                     </div>
                     <div class="text-right space-x-2">
-                        <!-- ÄNDERUNG: Button ist jetzt ein einfacher Link. -->
                         <a href="{{ url_for('webupdate_page') }}" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300 inline-block">Update jetzt ausführen</a>
                         <button type="submit" class="form-button">Speichern</button>
                     </div>
@@ -79,7 +75,6 @@
                 </button>
             </h2>
             <div x-show="openAccordion === 'mail'" class="p-5 bg-white border border-gray-200 rounded-b-md">
-                <!-- ÄNDERUNG: Formular sendet direkt an den Backend-Endpunkt. -->
                 <form id="form-mail" action="{{ url_for('api_save_mail') }}" method="POST" class="space-y-4">
                     <div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_enabled" name="mail_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.enabled %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_enabled" class="font-medium text-gray-700">Mail-Benachrichtigungen aktivieren</label></div></div>
                     <div class="space-y-4">
@@ -109,7 +104,6 @@
                 </button>
             </h2>
             <div x-show="openAccordion === 'system'" class="p-5 bg-white border border-gray-200 rounded-b-md divide-y">
-                <!-- ÄNDERUNG: Formular sendet direkt an den Backend-Endpunkt. -->
                 <form id="form-log_settings" action="{{ url_for('api_save_log_settings') }}" method="POST" class="py-4 space-y-2">
                     <label for="log_retention_hours" class="block text-sm font-medium text-gray-700">Aufbewahrungsdauer Protokoll (in Stunden)</label>
                     <div class="flex items-center space-x-2">
@@ -156,10 +150,6 @@
 
 {% block scripts %}
 <script>
-    // ÄNDERUNG: Die Funktion saveForm wird nicht mehr benötigt, da die Formulare direkt senden.
-    // Die komplexeren Funktionen für Test-Mail, Backup, Restore und System-Update bleiben erhalten,
-    // da sie eine bessere User Experience bieten.
-
     function startSystemUpdate() {
         const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
         
@@ -176,10 +166,8 @@
         }));
 
         const evtSource = new EventSource("{{ url_for('system_update') }}");
-        // ÄNDERUNG: outputPre wird hier deklariert, damit es im ganzen Gültigkeitsbereich der Funktion verfügbar ist.
         let outputPre;
 
-        // Warten, bis das Modal im DOM ist, um das pre-Element zu finden.
         setTimeout(() => {
             outputPre = document.getElementById('update-output-pre');
 
@@ -192,46 +180,42 @@
                     outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight;
                 }
             };
-        }, 100); // Eine kleine Verzögerung reicht normalerweise aus.
+        }, 100);
 
 
-        const onUpdateFinish = (success, details) => {
+        const onUpdateFinish = (success, message) => {
             evtSource.close();
             
-            // outputPre könnte hier null sein, wenn das Modal schnell geschlossen wird.
             const currentOutputPre = document.getElementById('update-output-pre');
             if (!currentOutputPre) return;
+
+            // Die finale Nachricht vom Server wird direkt zum Log hinzugefügt.
+            currentOutputPre.textContent += `\n${message}\n`;
 
             const finalState = {
                 showCancel: false,
                 disableConfirm: false,
-                onConfirm: () => window.location.reload(), // Seite nach Bestätigung neu laden
-                confirmText: 'OK & Neu laden'
+                onConfirm: () => window.location.href = "{{ url_for('logout') }}",
+                confirmText: 'OK & Abmelden'
             };
 
             if (success) {
                 finalState.type = 'success';
                 finalState.title = 'Update erfolgreich';
-                currentOutputPre.textContent += '\n🔄 Update erfolgreich abgeschlossen!\n';
             } else {
                 finalState.type = 'danger';
                 finalState.title = 'Update fehlgeschlagen';
-                currentOutputPre.textContent += `\n🛑 Update fehlgeschlagen...\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
                 finalState.confirmText = 'Schließen';
-                finalState.onConfirm = () => { // Nur Modal schließen bei Fehler
+                finalState.onConfirm = () => { 
                     const modalEl = document.querySelector('[x-data][aria-modal="true"]');
                     if (modalEl) modalEl.__x.data.show = false;
                 };
             }
             
-            // ÄNDERUNG: Hier ist die Korrektur für das Scroll-Problem.
-            // Wir müssen den Inhalt des Modals neu erstellen, um den finalen Status anzuzeigen.
             finalState.message = currentOutputPre.parentElement.outerHTML;
 
-            // Modal mit dem finalen Status aktualisieren
             window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
             
-            // Nach dem Update des DOM durch AlpineJS wird der Scroll-Balken wieder nach unten gesetzt.
             if (typeof Alpine !== 'undefined') {
                 Alpine.nextTick(() => {
                     const newOutput = document.getElementById('update-output-pre');
@@ -243,10 +227,10 @@
         };
 
         evtSource.addEventListener("close", (event) => onUpdateFinish(true, event.data));
-        evtSource.addEventListener("error", (event) => onUpdateFinish(false, event.data));
+        evtSource.addEventListener("update_error", (event) => onUpdateFinish(false, event.data));
         evtSource.onerror = (err) => {
             console.error("EventSource failed:", err);
-            onUpdateFinish(false, "Verbindung zum Server verloren.");
+            onUpdateFinish(false, "🛑 Update fehlgeschlagen... Details: Verbindung zum Server verloren.");
         };
     }
 
@@ -254,7 +238,6 @@
         const btn = this;
         btn.disabled = true;
         btn.textContent = 'Sende...';
-        // Sammelt die Daten aus dem Mail-Formular, auch wenn es jetzt ein action-Attribut hat.
         const formData = new FormData(document.getElementById('form-mail'));
         showModal('Sende Test-Mail...', 'info');
         fetch('/api/testmail', { method: 'POST', body: formData })
@@ -311,7 +294,6 @@
             .then(data => {
                 if (data.success) {
                     showModal(data.message, 'success');
-                    // Seite neu laden, um den Benutzer zur Neuanmeldung zu zwingen
                     setTimeout(() => window.location.href = "{{ url_for('login') }}", 2000);
                 } else {
                     showModal(data.message, 'danger');
