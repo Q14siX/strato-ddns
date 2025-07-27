@@ -70,7 +70,7 @@ def get_log_retention_hours():
     return int(config.get("log_retention_hours", 24))
 
 def get_public_ip():
-    """Ermittelt die öffentliche IP-Adresse."""
+    """Ermittelt die öffentliche IP-Adresse. Gibt None bei einem Fehler zurück."""
     try:
         response = requests.get("https://api.ipify.org", timeout=5)
         response.raise_for_status()
@@ -93,17 +93,20 @@ def prune_old_logs(root, retention_hours):
     for entry in root.findall('entry'):
         t = entry.findtext("timestamp") or ""
         try:
-            dt_format = "%Y-%m-%d %H:%M:%S" if "-" in t else "%d.%m.%Y %H:%M:%S"
-            dt = datetime.strptime(t, dt_format).replace(tzinfo=TIMEZONE)
+            # KORREKTUR: Zusätzlicher try-except-Block, um bei ungültigen Zeitstempeln
+            # nicht den gesamten Prozess abzubrechen.
+            dt = datetime.fromisoformat(t).astimezone(TIMEZONE)
             if dt < cutoff:
                 to_remove.append(entry)
         except ValueError:
+            # Ignoriere Einträge mit fehlerhaftem Zeitstempelformat
+            print(f"Warnung: Ungültiges Zeitstempelformat im Log gefunden: {t}")
             continue
     for entry in to_remove:
         root.remove(entry)
 
 def append_log_entries(new_entries):
-    """Fügt neue Einträge zum Log hinzu."""
+    """Fügt neue Einträge zum Log hinzu und rotiert alte Einträge."""
     retention_hours = get_log_retention_hours()
     try:
         if os.path.exists(LOG_FILE):
@@ -117,6 +120,7 @@ def append_log_entries(new_entries):
 
         for timestamp, event, trigger, domain, ip, status in new_entries:
             entry = ET.SubElement(root, 'entry')
+            # Zeitstempel immer im ISO-Format speichern für Eindeutigkeit
             ET.SubElement(entry, 'timestamp').text = timestamp
             ET.SubElement(entry, 'event').text = event
             ET.SubElement(entry, 'trigger').text = trigger
@@ -209,7 +213,7 @@ def setup_session():
 @app.errorhandler(RateLimitExceeded)
 def handle_ratelimit(e):
     flash(f"Zu viele Versuche. Limit: {e.description}", "danger")
-    return render_template("login.html", disabled=True), 429
+    return render_template("login.html"), 429
 
 @app.errorhandler(404)
 def not_found(e):
@@ -240,7 +244,6 @@ def login():
             flash("Falsche Zugangsdaten.", "danger")
     return render_template('login.html')
 
-# ÄNDERUNG: Die /logout Route rendert nun die neue logout.html Seite.
 @app.route('/logout')
 def logout():
     session.clear()
@@ -255,17 +258,27 @@ def log_page():
             tree = ET.parse(LOG_FILE)
             root = tree.getroot()
             for entry in root.findall('entry'):
+                dt_str = entry.findtext("timestamp", "N/A")
+                # Formatierung für die Anzeige
+                try:
+                    dt_obj = datetime.fromisoformat(dt_str)
+                    display_dt = dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    display_dt = dt_str
+
                 entries.append({
-                    "datetime": entry.findtext("timestamp", "N/A"),
+                    "datetime": display_dt,
                     "trigger": entry.findtext("trigger", "N/A"),
                     "domain": entry.findtext("domain", "N/A"),
                     "ip": entry.findtext("ip", "N/A"),
-                    "status": entry.findtext("status", "N/A")
+                    "status": entry.findtext("status", "N/A"),
+                    "raw_datetime": dt_str # Für die Sortierung
                 })
-            entries.sort(key=lambda x: x["datetime"], reverse=True)
+            # Sortiere nach dem ISO-Zeitstempel für Korrektheit
+            entries.sort(key=lambda x: x["raw_datetime"], reverse=True)
         except ET.ParseError:
             flash("Fehler beim Lesen der Log-Datei.", "danger")
-    return render_template("log.html", log_entries=entries, pagename="log")
+    return render_template("log.html", log_entries=entries)
 
 @app.route('/config')
 @login_required
@@ -277,8 +290,7 @@ def config_page():
         password=config.get("password", ""),
         domains="\n".join(config.get("domains", [])),
         mail_settings=get_mail_settings(config),
-        log_retention_hours=config.get("log_retention_hours", 24),
-        pagename="config"
+        log_retention_hours=config.get("log_retention_hours", 24)
     )
 
 @app.route('/webupdate')
@@ -292,7 +304,7 @@ def webupdate_page():
     results = []
     new_log_entries = []
     now = datetime.now(TIMEZONE)
-    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = now.isoformat()
     event = "Manuelles Update"
     trigger = "manuell"
 
@@ -314,14 +326,15 @@ def webupdate_page():
         results.append((domain, returned_ip, status))
         new_log_entries.append((timestamp, event, trigger, domain, returned_ip, status))
 
-    append_log_entries(new_log_entries)
+    if new_log_entries:
+        append_log_entries(new_log_entries)
     
     ms = get_mail_settings(config)
     if ms.get("enabled") and ms.get("notify_on_success"):
         subject = f"{ms.get('subject', 'Strato DDNS')} – {event}"
         send_mail(config, subject, results, timestamp, event, trigger)
 
-    return render_template('webupdate.html', ip=ip, results=results, pagename="update")
+    return render_template('webupdate.html', ip=ip, results=results)
 
 
 # --- API Endpunkte ---
@@ -470,6 +483,12 @@ def api_testmail():
 @app.route('/api/system_update')
 @login_required
 def system_update():
+    # SICHERHEITSHINWEIS: Das Ausführen von Shell-Skripten, die direkt aus dem
+    # Internet geladen werden, stellt ein erhebliches Sicherheitsrisiko dar.
+    # Dieser Code erlaubt potenziell die Ausführung von beliebigem Code auf dem Server,
+    # wenn die Quelle (GitHub-Repository) kompromittiert wird.
+    # DIESE FUNKTION SOLLTE NUR IN EINER KONTROLLIERTEN UMGEBUNG UND MIT
+    # VOLLEM BEWUSSTSEIN DER RISIKEN VERWENDET WERDEN.
     def generate_output():
         script_commands = """
         set -e
@@ -480,25 +499,29 @@ def system_update():
         source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
         """
         
-        process = subprocess.Popen(
-            ['bash', '-c', script_commands],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True
-        )
-        
-        for line in iter(process.stdout.readline, ''):
-            yield f"data: {line.strip()}\n\n"
+        try:
+            process = subprocess.Popen(
+                ['bash', '-c', script_commands],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
             
-        process.wait()
-        
-        if process.returncode == 0:
-            yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
-        else:
-            details = f"Prozess endete mit Fehlercode {process.returncode}."
-            yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
+            for line in iter(process.stdout.readline, ''):
+                yield f"data: {line.strip()}\n\n"
+                
+            process.wait()
+            
+            if process.returncode == 0:
+                yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
+            else:
+                details = f"Prozess endete mit Fehlercode {process.returncode}."
+                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
+        except Exception as e:
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Update-Prozesses: {e}\n\n"
+
 
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
@@ -522,7 +545,7 @@ def download_log_excel():
             datum, uhrzeit = "N/A", "N/A"
             if dt_str:
                 try:
-                    dt_obj = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+                    dt_obj = datetime.fromisoformat(dt_str)
                     datum = dt_obj.strftime("%d.%m.%Y")
                     uhrzeit = dt_obj.strftime("%H:%M:%S")
                 except ValueError:
@@ -558,7 +581,7 @@ def update():
     config = load_config()
     client_ip = get_remote_address()
     now = datetime.now(TIMEZONE)
-    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = now.isoformat()
     
     failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto.get(client_ip, []) if now - t < timedelta(hours=1)]
     if len(failed_attempts_auto.get(client_ip, [])) >= 10:
@@ -567,7 +590,7 @@ def update():
     req_user = request.args.get('username')
     req_pass = request.args.get('password')
     req_ip = request.args.get('myip')
-    ip_list = [i.strip() for i in req_ip.split(',')] if req_ip else [get_public_ip()]
+    ip_list = [i.strip() for i in req_ip.split(',') if i.strip()] if req_ip else [get_public_ip()]
     
     if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
@@ -588,7 +611,7 @@ def update():
             
         return Response("badauth", mimetype='text/plain'), 401
 
-    if not any(ip_list):
+    if not any(ip for ip in ip_list):
         return Response("noip", mimetype='text/plain'), 400
         
     username = config.get("username", "")
@@ -625,17 +648,34 @@ def update():
     if new_log_entries:
         append_log_entries(new_log_entries)
 
+    # KORREKTUR: Die Logik für Mail-Benachrichtigungen wurde überarbeitet,
+    # um die Benutzereinstellungen präzise zu berücksichtigen.
     ms = get_mail_settings(config)
     if results and ms.get("enabled"):
-        has_success = any(r[2].lower() in ["good", "nochg"] for r in results)
-        has_error = not has_success
+        statuses = {r[2].lower() for r in results}
+        should_notify = False
         
-        if (ms.get("notify_on_success") and has_success) or (ms.get("notify_on_badauth") and has_error):
+        # Benachrichtigung bei Erfolg, falls aktiviert
+        if ms.get("notify_on_success") and any(s in ["good", "nochg"] for s in statuses):
+            should_notify = True
+        
+        # Benachrichtigung bei spezifischen Fehlern, falls aktiviert
+        if ms.get("notify_on_abuse") and "abuse" in statuses:
+            should_notify = True
+        if ms.get("notify_on_badauth") and "badauth" in statuses:
+            should_notify = True
+        
+        # Hier könnten weitere Fehlerprüfungen hinzugefügt werden,
+        # z.B. für "nohost", "notfqdn" etc., falls gewünscht.
+
+        if should_notify:
             subject = f"{ms.get('subject', 'Strato DDNS')} – Auto-Update"
             send_mail(config, subject, results, timestamp, "Auto-Update", "automatisch")
 
-    return Response(f"{overall_status} {ip_list[0]}", mimetype='text/plain')
+    return Response(f"{overall_status} {ip_list[0] if ip_list else ''}", mimetype='text/plain')
 
 
 if __name__ == '__main__':
+    # Für die Produktion wird ein WSGI-Server wie Gunicorn oder uWSGI empfohlen.
+    # debug=False ist wichtig für den Live-Betrieb.
     app.run(host='0.0.0.0', port=80, debug=False)
