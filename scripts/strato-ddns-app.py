@@ -203,8 +203,6 @@ def login_required(f):
 def setup_session():
     config = load_config()
     app.secret_key = config.get("secret_key")
-    # ÄNDERUNG: Setzt die Lebensdauer der permanenten Session.
-    # Dies hilft, die Session über Server-Neustarts hinweg zu erhalten.
     app.permanent_session_lifetime = timedelta(days=30)
 
 
@@ -236,8 +234,6 @@ def login():
         pw = request.form.get('password')
         if user == config.get("webuser") and pw == config.get("webpass"):
             session['logged_in'] = True
-            # ÄNDERUNG: Macht die Session permanent (verwendet `permanent_session_lifetime`).
-            # Dies ist der Schlüssel, um nach einem Update eingeloggt zu bleiben.
             session.permanent = True
             return redirect(url_for('log_page'))
         else:
@@ -329,10 +325,6 @@ def webupdate_page():
 
 # --- API Endpunkte ---
 
-# ÄNDERUNG: Die Speicher-Endpunkte geben nun kein JSON mehr zurück.
-# Stattdessen verwenden sie `flash` für Nachrichten und leiten zur Konfigurationsseite zurück.
-# Dies vereinfacht das Frontend-JavaScript (kann entfernt werden) und verlagert die Logik ins Backend.
-
 @app.route('/api/save/strato', methods=['POST'])
 @login_required
 def api_save_strato():
@@ -385,7 +377,6 @@ def api_save_access():
     save_config(config)
     flash("Zugangsdaten aktualisiert. Bei Passwortänderung bitte neu anmelden.", "success")
     
-    # Bei Passwortänderung wird der Benutzer zur Sicherheit ausgeloggt.
     if new_pass:
         session.clear()
         return redirect(url_for('login'))
@@ -407,10 +398,6 @@ def api_save_log_settings():
     except (ValueError, TypeError):
         flash("Ungültiger Wert für Stunden.", "danger")
     return redirect(url_for('config_page'))
-
-# Die folgenden Endpunkte (Backup, Restore, Testmail, System-Update) bleiben bestehen,
-# da sie eine komplexere UI-Interaktion erfordern, die mit einfachem Form-Posting
-# nicht benutzerfreundlich umzusetzen ist (z.B. Datei-Downloads, Live-Feedback).
 
 @app.route('/api/backup/download', methods=['POST'])
 @login_required
@@ -447,7 +434,6 @@ def api_restore_backup():
         decrypted = fernet.decrypt(file.read())
         config_data = json.loads(decrypted)
         save_config(config_data)
-        # Nach der Wiederherstellung wird der Benutzer ausgeloggt, um eine Neuanmeldung mit potenziell neuen Daten zu erzwingen.
         session.clear()
         return jsonify(success=True, message="Konfiguration erfolgreich wiederhergestellt. Bitte melden Sie sich neu an.")
     except Exception as e:
@@ -508,8 +494,9 @@ def system_update():
         process.wait()
         
         if process.returncode == 0:
-            # ÄNDERUNG: Neutralere Nachricht, da der Client den Reload steuert.
-            yield "event: close\ndata: Update-Prozess auf dem Server beendet.\n\n"
+            # ÄNDERUNG: Den Benutzer nach erfolgreichem Update serverseitig abmelden.
+            session.clear()
+            yield "event: close\ndata: Update-Prozess auf dem Server beendet. Benutzer wird abgemeldet.\n\n"
         else:
             yield f"event: error\ndata: 🛑 Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
 
