@@ -30,7 +30,7 @@ apt-get install -yqq \
   sudo
 
 echo "🐍 Python Abhängigkeiten ggf. nachinstallieren..."
-pip3 install --break-system-packages --quiet openpyxl
+pip3 install --break-system-packages --quiet --root-user-action=ignore openpyxl
 
 echo "🖥️ Applikation aktualisieren..."
 wget -q -O "$APP_DIR/app.py" "$REPO_URL/scripts/strato-ddns-app.py"
