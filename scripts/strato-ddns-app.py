@@ -240,10 +240,11 @@ def login():
             flash("Falsche Zugangsdaten.", "danger")
     return render_template('login.html')
 
+# ÄNDERUNG: Die /logout Route rendert nun die neue logout.html Seite.
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return render_template('logout.html')
 
 @app.route('/log')
 @login_required
@@ -494,7 +495,6 @@ def system_update():
         process.wait()
         
         if process.returncode == 0:
-            session.clear()
             yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
         else:
             details = f"Prozess endete mit Fehlercode {process.returncode}."
