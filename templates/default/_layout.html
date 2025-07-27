@@ -97,11 +97,9 @@
         <a href="https://github.com/Q14siX/strato-ddns" target="_blank" class="text-white no-underline hover:text-gray-200" style="text-decoration: none;">Projektseite auf GitHub</a>
     </footer>
 
-    <!-- Globales Modal-Fenster -->
     <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '' }"
          @show-modal.window="
             show = true;
-            // Nur Eigenschaften aktualisieren, die im Event vorhanden sind
             if ($event.detail.type !== undefined) type = $event.detail.type;
             if ($event.detail.title !== undefined) title = $event.detail.title;
             if ($event.detail.message !== undefined) message = $event.detail.message;
@@ -113,9 +111,18 @@
          x-show="show"
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-         aria-labelledby="modal-title" role="dialog" aria-modal="true">
+         aria-labelledby="modal-title" role="dialog" aria-modal="true"
+         
+         @keydown.window.prevent.enter="
+            if (show && !confirmDisabled) {
+                const confirmButton = $el.querySelector('.form-button:not([disabled])');
+                if (confirmButton) {
+                    confirmButton.click();
+                }
+            }
+         ">
         
-        <div @click.away="if (!confirmDisabled) show = false" 
+        <div 
              x-show="show"
              x-transition:enter="ease-out duration-300"
              x-transition:enter-start="opacity-0 scale-95"
