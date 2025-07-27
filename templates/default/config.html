@@ -194,8 +194,6 @@
             const finalState = {
                 showCancel: false,
                 disableConfirm: false,
-                // ÄNDERUNG: Die onConfirm-Aktion wird geändert, um einen echten Link-Klick zu simulieren.
-                // Dies ist robuster als window.location.href.
                 onConfirm: () => {
                     const logoutLink = document.createElement('a');
                     logoutLink.href = "{{ url_for('logout') }}";
