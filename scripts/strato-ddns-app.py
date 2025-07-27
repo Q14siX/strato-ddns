@@ -203,6 +203,10 @@ def login_required(f):
 def setup_session():
     config = load_config()
     app.secret_key = config.get("secret_key")
+    # ÄNDERUNG: Setzt die Lebensdauer der permanenten Session.
+    # Dies hilft, die Session über Server-Neustarts hinweg zu erhalten.
+    app.permanent_session_lifetime = timedelta(days=30)
+
 
 @app.errorhandler(RateLimitExceeded)
 def handle_ratelimit(e):
@@ -232,6 +236,9 @@ def login():
         pw = request.form.get('password')
         if user == config.get("webuser") and pw == config.get("webpass"):
             session['logged_in'] = True
+            # ÄNDERUNG: Macht die Session permanent (verwendet `permanent_session_lifetime`).
+            # Dies ist der Schlüssel, um nach einem Update eingeloggt zu bleiben.
+            session.permanent = True
             return redirect(url_for('log_page'))
         else:
             flash("Falsche Zugangsdaten.", "danger")
@@ -322,6 +329,10 @@ def webupdate_page():
 
 # --- API Endpunkte ---
 
+# ÄNDERUNG: Die Speicher-Endpunkte geben nun kein JSON mehr zurück.
+# Stattdessen verwenden sie `flash` für Nachrichten und leiten zur Konfigurationsseite zurück.
+# Dies vereinfacht das Frontend-JavaScript (kann entfernt werden) und verlagert die Logik ins Backend.
+
 @app.route('/api/save/strato', methods=['POST'])
 @login_required
 def api_save_strato():
@@ -330,7 +341,8 @@ def api_save_strato():
     config["password"] = request.form.get("password", "")
     config["domains"] = [d.strip() for d in request.form.get("domains", "").splitlines() if d.strip()]
     save_config(config)
-    return jsonify(success=True, message="Strato DDNS Einstellungen gespeichert.")
+    flash("Strato DDNS Einstellungen gespeichert.", "success")
+    return redirect(url_for('config_page'))
 
 @app.route('/api/save/mail', methods=['POST'])
 @login_required
@@ -351,7 +363,8 @@ def api_save_mail():
     ms["notify_on_abuse"] = "mail_notify_abuse" in request.form
     config["mail_settings"] = ms
     save_config(config)
-    return jsonify(success=True, message="Mail-Einstellungen gespeichert.")
+    flash("Mail-Einstellungen gespeichert.", "success")
+    return redirect(url_for('config_page'))
 
 @app.route('/api/save/access', methods=['POST'])
 @login_required
@@ -359,14 +372,25 @@ def api_save_access():
     config = load_config()
     new_user = request.form.get("new_webuser", "").strip()
     new_pass = request.form.get("new_webpass", "")
+    
     if new_pass and new_pass != request.form.get("confirm_webpass", ""):
-        return jsonify(success=False, message="Passwörter stimmen nicht überein!"), 400
+        flash("Passwörter stimmen nicht überein!", "danger")
+        return redirect(url_for('config_page'))
+        
     if new_user:
         config["webuser"] = new_user
     if new_pass:
         config["webpass"] = new_pass
+        
     save_config(config)
-    return jsonify(success=True, message="Zugangsdaten aktualisiert.")
+    flash("Zugangsdaten aktualisiert. Bei Passwortänderung bitte neu anmelden.", "success")
+    
+    # Bei Passwortänderung wird der Benutzer zur Sicherheit ausgeloggt.
+    if new_pass:
+        session.clear()
+        return redirect(url_for('login'))
+        
+    return redirect(url_for('config_page'))
 
 @app.route('/api/save/log_settings', methods=['POST'])
 @login_required
@@ -375,12 +399,18 @@ def api_save_log_settings():
     try:
         hours = int(request.form.get("log_retention_hours", 24))
         if hours < 1:
-            return jsonify(success=False, message="Aufbewahrungsdauer muss mindestens 1 Stunde betragen."), 400
+            flash("Aufbewahrungsdauer muss mindestens 1 Stunde betragen.", "danger")
+            return redirect(url_for('config_page'))
         config["log_retention_hours"] = hours
         save_config(config)
-        return jsonify(success=True, message="Protokoll-Einstellungen gespeichert.")
+        flash("Protokoll-Einstellungen gespeichert.", "success")
     except (ValueError, TypeError):
-        return jsonify(success=False, message="Ungültiger Wert für Stunden."), 400
+        flash("Ungültiger Wert für Stunden.", "danger")
+    return redirect(url_for('config_page'))
+
+# Die folgenden Endpunkte (Backup, Restore, Testmail, System-Update) bleiben bestehen,
+# da sie eine komplexere UI-Interaktion erfordern, die mit einfachem Form-Posting
+# nicht benutzerfreundlich umzusetzen ist (z.B. Datei-Downloads, Live-Feedback).
 
 @app.route('/api/backup/download', methods=['POST'])
 @login_required
@@ -417,7 +447,9 @@ def api_restore_backup():
         decrypted = fernet.decrypt(file.read())
         config_data = json.loads(decrypted)
         save_config(config_data)
-        return jsonify(success=True, message="Konfiguration erfolgreich wiederhergestellt. Die Seite wird neu geladen.")
+        # Nach der Wiederherstellung wird der Benutzer ausgeloggt, um eine Neuanmeldung mit potenziell neuen Daten zu erzwingen.
+        session.clear()
+        return jsonify(success=True, message="Konfiguration erfolgreich wiederhergestellt. Bitte melden Sie sich neu an.")
     except Exception as e:
         return jsonify(success=False, message=f"Wiederherstellung fehlgeschlagen: {e}"), 400
 
@@ -459,7 +491,7 @@ def system_update():
         export APP_DIR="/opt/strato-ddns"
         
         source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
-        """.format(app_dir=BASE_DIR)
+        """
         
         process = subprocess.Popen(
             ['bash', '-c', script_commands],
@@ -476,7 +508,8 @@ def system_update():
         process.wait()
         
         if process.returncode == 0:
-            yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen!\n\n"
+            # ÄNDERUNG: Neutralere Nachricht, da der Client den Reload steuert.
+            yield "event: close\ndata: Update-Prozess auf dem Server beendet.\n\n"
         else:
             yield f"event: error\ndata: 🛑 Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
 
