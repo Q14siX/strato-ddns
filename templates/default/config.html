@@ -168,6 +168,7 @@
         const evtSource = new EventSource("{{ url_for('system_update') }}");
         let outputPre;
 
+        // Kurze Verzögerung, um sicherzustellen, dass das Modal-Element im DOM ist
         setTimeout(() => {
             outputPre = document.getElementById('update-output-pre');
 
@@ -194,12 +195,15 @@
             const finalState = {
                 showCancel: false,
                 disableConfirm: false,
+                // KORREKTUR: Direkte Navigation statt Erstellen eines Links.
                 onConfirm: () => {
-                    const logoutLink = document.createElement('a');
-                    logoutLink.href = "{{ url_for('logout') }}";
-                    document.body.appendChild(logoutLink);
-                    logoutLink.click();
-                    document.body.removeChild(logoutLink);
+                    if (success) {
+                        window.location.href = "{{ url_for('logout') }}";
+                    } else {
+                        // Modal schließen bei Fehler
+                        const modalEl = document.querySelector('[x-data][aria-modal="true"]');
+                        if (modalEl) modalEl.__x.data.show = false;
+                    }
                 },
                 confirmText: 'OK'
             };
@@ -211,16 +215,13 @@
                 finalState.type = 'danger';
                 finalState.title = 'Update fehlgeschlagen';
                 finalState.confirmText = 'Schließen';
-                finalState.onConfirm = () => { 
-                    const modalEl = document.querySelector('[x-data][aria-modal="true"]');
-                    if (modalEl) modalEl.__x.data.show = false;
-                };
             }
             
             finalState.message = currentOutputPre.parentElement.outerHTML;
 
             window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
             
+            // Sicherstellen, dass die aktualisierte Ansicht nach unten scrollt
             if (typeof Alpine !== 'undefined') {
                 Alpine.nextTick(() => {
                     const newOutput = document.getElementById('update-output-pre');
@@ -244,7 +245,12 @@
         btn.disabled = true;
         btn.textContent = 'Sende...';
         const formData = new FormData(document.getElementById('form-mail'));
-        showModal('Sende Test-Mail...', 'info');
+        
+        // Modal sofort schließen, das Ergebnis wird in einem neuen Modal angezeigt
+        const modalEl = document.querySelector('[x-data][aria-modal="true"]');
+        if (modalEl) modalEl.__x.data.show = false;
+
+        showModal('Sende Test-Mail...', 'info', 'Test-Mail');
         fetch('/api/testmail', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => data.success ? showModal(data.message, 'success') : showModal(data.message, 'danger'))
@@ -262,7 +268,7 @@
             return;
         }
         const formData = new FormData(document.getElementById('form-backup'));
-        showModal('Sicherung wird erstellt...', 'info');
+        showModal('Sicherung wird erstellt...', 'info', 'Backup');
         fetch('/api/backup/download', { method: 'POST', body: formData })
             .then(async res => {
                 if (!res.ok) {
@@ -293,7 +299,7 @@
             return;
         }
         const formData = new FormData(document.getElementById('form-restore'));
-        showModal('Sicherung wird wiederhergestellt...', 'info');
+        showModal('Sicherung wird wiederhergestellt...', 'info', 'Restore');
         fetch('/api/backup/restore', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
