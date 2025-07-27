@@ -41,6 +41,7 @@ wget -q -O "$APP_DIR/templates/_layout.html" "$REPO_URL/templates/default/_layou
 wget -q -O "$APP_DIR/templates/config.html" "$REPO_URL/templates/default/config.html"
 wget -q -O "$APP_DIR/templates/log.html" "$REPO_URL/templates/default/log.html"
 wget -q -O "$APP_DIR/templates/login.html" "$REPO_URL/templates/default/login.html"
+wget -q -O "$APP_DIR/templates/logout.html" "$REPO_URL/templates/default/logout.html"
 wget -q -O "$APP_DIR/templates/webupdate.html" "$REPO_URL/templates/default/webupdate.html"
                 
 echo "🛠️ Service-Dienste werden in Kürze neu gestartet..."
