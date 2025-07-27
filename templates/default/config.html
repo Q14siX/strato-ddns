@@ -189,13 +189,20 @@
             const currentOutputPre = document.getElementById('update-output-pre');
             if (!currentOutputPre) return;
 
-            // Die finale Nachricht vom Server wird direkt zum Log hinzugefügt.
             currentOutputPre.textContent += `\n${message}\n`;
 
             const finalState = {
                 showCancel: false,
                 disableConfirm: false,
-                onConfirm: () => window.location.href = "{{ url_for('logout') }}",
+                // ÄNDERUNG: Die onConfirm-Aktion wird geändert, um einen echten Link-Klick zu simulieren.
+                // Dies ist robuster als window.location.href.
+                onConfirm: () => {
+                    const logoutLink = document.createElement('a');
+                    logoutLink.href = "{{ url_for('logout') }}";
+                    document.body.appendChild(logoutLink);
+                    logoutLink.click();
+                    document.body.removeChild(logoutLink);
+                },
                 confirmText: 'OK & Abmelden'
             };
 
