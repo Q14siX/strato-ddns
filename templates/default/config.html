@@ -176,22 +176,31 @@
         }));
 
         const evtSource = new EventSource("{{ url_for('system_update') }}");
-        const outputPre = document.getElementById('update-output-pre');
+        // ÄNDERUNG: outputPre wird hier deklariert, damit es im ganzen Gültigkeitsbereich der Funktion verfügbar ist.
+        let outputPre;
 
-        evtSource.onmessage = function(event) {
-            if (outputPre && outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
-                outputPre.textContent = ''; 
-            }
-            if (outputPre) {
-                outputPre.textContent += event.data + '\n';
-                outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight;
-            }
-        };
+        // Warten, bis das Modal im DOM ist, um das pre-Element zu finden.
+        setTimeout(() => {
+            outputPre = document.getElementById('update-output-pre');
+
+            evtSource.onmessage = function(event) {
+                if (outputPre && outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
+                    outputPre.textContent = ''; 
+                }
+                if (outputPre) {
+                    outputPre.textContent += event.data + '\n';
+                    outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight;
+                }
+            };
+        }, 100); // Eine kleine Verzögerung reicht normalerweise aus.
+
 
         const onUpdateFinish = (success, details) => {
             evtSource.close();
             
-            if (!outputPre) return;
+            // outputPre könnte hier null sein, wenn das Modal schnell geschlossen wird.
+            const currentOutputPre = document.getElementById('update-output-pre');
+            if (!currentOutputPre) return;
 
             const finalState = {
                 showCancel: false,
@@ -203,11 +212,11 @@
             if (success) {
                 finalState.type = 'success';
                 finalState.title = 'Update erfolgreich';
-                outputPre.textContent += '\n🔄 Update erfolgreich abgeschlossen!\n';
+                currentOutputPre.textContent += '\n🔄 Update erfolgreich abgeschlossen!\n';
             } else {
                 finalState.type = 'danger';
                 finalState.title = 'Update fehlgeschlagen';
-                outputPre.textContent += `\n🛑 Update fehlgeschlagen...\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
+                currentOutputPre.textContent += `\n🛑 Update fehlgeschlagen...\nDetails: ${details || 'Keine Details verfügbar.'}\n`;
                 finalState.confirmText = 'Schließen';
                 finalState.onConfirm = () => { // Nur Modal schließen bei Fehler
                     const modalEl = document.querySelector('[x-data][aria-modal="true"]');
@@ -217,7 +226,7 @@
             
             // ÄNDERUNG: Hier ist die Korrektur für das Scroll-Problem.
             // Wir müssen den Inhalt des Modals neu erstellen, um den finalen Status anzuzeigen.
-            finalState.message = outputPre.parentElement.outerHTML;
+            finalState.message = currentOutputPre.parentElement.outerHTML;
 
             // Modal mit dem finalen Status aktualisieren
             window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
