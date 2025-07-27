@@ -494,11 +494,13 @@ def system_update():
         process.wait()
         
         if process.returncode == 0:
-            # ÄNDERUNG: Den Benutzer nach erfolgreichem Update serverseitig abmelden.
             session.clear()
-            yield "event: close\ndata: Update-Prozess auf dem Server beendet. Benutzer wird abgemeldet.\n\n"
+            # ÄNDERUNG: Die formatierte Erfolgsmeldung wird jetzt hier generiert.
+            yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
         else:
-            yield f"event: error\ndata: 🛑 Update mit Fehlercode {process.returncode} fehlgeschlagen.\n\n"
+            # ÄNDERUNG: Die formatierte Fehlermeldung wird jetzt hier generiert und über ein benutzerdefiniertes Event gesendet.
+            details = f"Prozess endete mit Fehlercode {process.returncode}."
+            yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
 
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
