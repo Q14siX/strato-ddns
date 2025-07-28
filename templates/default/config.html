@@ -30,7 +30,7 @@
                         <input type="password" name="confirm_webpass" id="confirm_webpass" class="input-field" placeholder="••••••••">
                     </div>
                     <div class="text-right">
-                        <button type="submit" class="form-button">Speichern</button>
+                        <button type="button" id="save-access-btn" class="form-button">Speichern</button>
                     </div>
                 </form>
             </div>
@@ -60,7 +60,7 @@
                     </div>
                     <div class="text-right space-x-2">
                         <a href="{{ url_for('webupdate_page') }}" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300 inline-block">Update jetzt ausführen</a>
-                        <button type="submit" class="form-button">Speichern</button>
+                        <button type="button" id="save-strato-btn" class="form-button">Speichern</button>
                     </div>
                 </form>
             </div>
@@ -89,7 +89,7 @@
                     <fieldset class="mt-4"><legend class="text-sm font-medium text-gray-900">Wann sollen E-Mails gesendet werden?</legend><div class="mt-2 space-y-2"><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_success" name="mail_notify_success" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_success %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_success" class="text-gray-600">Update erfolgreich</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_badauth" name="mail_notify_badauth" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_badauth %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_badauth" class="text-gray-600">Login fehlgeschlagen</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_noip" name="mail_notify_noip" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_noip %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_noip" class="text-gray-600">Keine IP verfügbar</label></div></div><div class="relative flex items-start"><div class="flex h-5 items-center"><input id="mail_notify_abuse" name="mail_notify_abuse" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" {% if mail_settings.notify_on_abuse %}checked{% endif %}></div><div class="ml-3 text-sm"><label for="mail_notify_abuse" class="text-gray-600">DDNS Sperre</label></div></div></div></fieldset>
                     <div class="text-right space-x-2">
                         <button type="button" id="testMailBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Testen</button>
-                        <button type="submit" class="form-button">Speichern</button>
+                        <button type="button" id="save-mail-btn" class="form-button">Speichern</button>
                     </div>
                 </form>
             </div>
@@ -108,15 +108,15 @@
                     <label for="log_retention_hours" class="block text-sm font-medium text-gray-700">Aufbewahrungsdauer Protokoll (in Stunden)</label>
                     <div class="flex items-center space-x-2">
                         <input type="number" name="log_retention_hours" id="log_retention_hours" value="{{ log_retention_hours }}" min="1" class="input-field flex-grow">
-                        <button type="submit" class="form-button">Speichern</button>
+                        <button type="button" id="save-log-btn" class="form-button">Speichern</button>
                     </div>
                 </form>
                 <div class="py-4 space-y-4">
-                    <form id="form-backup" class="space-y-2">
+                    <div id="form-backup" class="space-y-2">
                         <label for="backup_password" class="block text-sm font-medium text-gray-700">Passwort für Sicherung</label>
                         <input type="password" name="backup_password" id="backup_password" class="input-field" placeholder="••••••••">
                         <button type="button" id="backupBtn" class="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Sicherung erstellen</button>
-                    </form>
+                    </div>
                     <form id="form-restore" class="space-y-2">
                         <label for="restore_password" class="block text-sm font-medium text-gray-700">Passwort für Wiederherstellung</label>
                         <input type="password" name="restore_password" id="restore_password" class="input-field" placeholder="••••••••">
@@ -139,7 +139,7 @@
             <div x-show="openAccordion === 'update'" class="p-5 bg-white border border-gray-200 rounded-b-md">
                 <div class="space-y-4">
                     <p class="text-sm text-gray-600">Führt ein Update der Anwendung auf die neueste Version von GitHub durch. Der Dienst wird danach automatisch neu gestartet.</p>
-                    <button id="systemUpdateBtn" onclick="startSystemUpdate()" class="form-button w-full">Systemupdate starten</button>
+                    <button id="systemUpdateBtn" class="form-button w-full">Systemupdate starten</button>
                 </div>
             </div>
         </div>
@@ -151,82 +151,109 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+
+        // Wrapper to handle form submissions with a confirmation modal
+        function-confirmAndSubmit(buttonId, formId, modalDetails) {
+            document.getElementById(buttonId).addEventListener('click', function(e) {
+                e.preventDefault();
+                showModal({
+                    type: modalDetails.type || 'confirm_danger',
+                    title: modalDetails.title,
+                    message: modalDetails.message,
+                    isStatic: true,
+                    onConfirm: () => {
+                        document.getElementById(formId).submit();
+                    }
+                });
+            });
+        }
+
+        // --- Attach confirmation handlers to all save buttons ---
+        confirmAndSubmit('save-access-btn', 'form-access', {
+            title: 'Zugangsdaten speichern?',
+            message: 'Wenn Sie das Passwort ändern, werden Sie aus Sicherheitsgründen abgemeldet. Fortfahren?'
+        });
+
+        confirmAndSubmit('save-strato-btn', 'form-strato', {
+            type: 'info',
+            title: 'Strato-Einstellungen speichern?',
+            message: 'Möchten Sie die Änderungen an den Strato DDNS-Einstellungen übernehmen?'
+        });
+
+        confirmAndSubmit('save-mail-btn', 'form-mail', {
+            type: 'info',
+            title: 'Mail-Einstellungen speichern?',
+            message: 'Möchten Sie die Änderungen an den Mail-Benachrichtigungen übernehmen?'
+        });
+
+        confirmAndSubmit('save-log-btn', 'form-log_settings', {
+            type: 'info',
+            title: 'Protokoll-Einstellungen speichern?',
+            message: 'Möchten Sie die Aufbewahrungsdauer für das Protokoll ändern?'
+        });
+
+
+        // --- Specific handlers for other actions ---
+
+        document.getElementById('systemUpdateBtn').addEventListener('click', function() {
+            showModal({
+                type: 'confirm_danger',
+                title: 'Systemupdate starten?',
+                message: 'Die Anwendung wird auf die neueste Version aktualisiert und neu gestartet. Sie werden danach abgemeldet. Fortfahren?',
+                isStatic: true,
+                onConfirm: startSystemUpdate
+            });
+        });
+
         function startSystemUpdate() {
             const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
             
-            window.dispatchEvent(new CustomEvent('show-modal', {
-                detail: {
-                    type: 'warning',
-                    title: 'Systemupdate läuft',
-                    message: updateMessage,
-                    onConfirm: null,
-                    showCancel: false,
-                    disableConfirm: true,
-                    confirmText: 'Update läuft...'
-                }
-            }));
+            showModal({
+                type: 'warning',
+                title: 'Systemupdate läuft',
+                message: updateMessage,
+                showCancel: false,
+                disableConfirm: true,
+                confirmText: 'Update läuft...',
+                isStatic: true,
+                closeOnConfirm: false
+            });
 
             const evtSource = new EventSource("{{ url_for('system_update') }}");
             let outputPre;
 
             setTimeout(() => {
                 outputPre = document.getElementById('update-output-pre');
-
                 evtSource.onmessage = function(event) {
-                    if (outputPre && outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
-                        outputPre.textContent = ''; 
-                    }
                     if (outputPre) {
+                        if (outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
+                            outputPre.textContent = ''; 
+                        }
                         outputPre.textContent += event.data + '\n';
                         outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight;
                     }
                 };
             }, 100);
 
-
             const onUpdateFinish = (success, message) => {
                 evtSource.close();
-                
                 const currentOutputPre = document.getElementById('update-output-pre');
-                if (!currentOutputPre) return;
-
-                currentOutputPre.textContent += `\n${message}\n`;
-
-                const finalState = {
-                    showCancel: false,
-                    disableConfirm: false,
+                if (currentOutputPre) {
+                    currentOutputPre.textContent += `\n${message}\n`;
+                }
+                
+                showModal({
+                    type: success ? 'success' : 'danger',
+                    title: success ? 'Update erfolgreich' : 'Update fehlgeschlagen',
+                    message: currentOutputPre ? currentOutputPre.parentElement.outerHTML : message,
+                    confirmText: success ? 'OK' : 'Schließen',
+                    isStatic: true,
                     onConfirm: () => {
                         if (success) {
                             window.location.href = "{{ url_for('logout') }}";
-                        } else {
-                            const modalEl = document.querySelector('[x-data][aria-modal="true"]');
-                            if (modalEl) modalEl.__x.data.show = false;
                         }
-                    },
-                    confirmText: 'OK'
-                };
-
-                if (success) {
-                    finalState.type = 'success';
-                    finalState.title = 'Update erfolgreich';
-                } else {
-                    finalState.type = 'danger';
-                    finalState.title = 'Update fehlgeschlagen';
-                    finalState.confirmText = 'Schließen';
-                }
-                
-                finalState.message = currentOutputPre.parentElement.outerHTML;
-
-                window.dispatchEvent(new CustomEvent('show-modal', { detail: finalState }));
-                
-                if (typeof Alpine !== 'undefined') {
-                    Alpine.nextTick(() => {
-                        const newOutput = document.getElementById('update-output-pre');
-                        if (newOutput) {
-                            newOutput.parentElement.scrollTop = newOutput.parentElement.scrollHeight;
-                        }
-                    });
-                }
+                    }
+                });
             };
 
             evtSource.addEventListener("close", (event) => onUpdateFinish(true, event.data));
@@ -237,19 +264,24 @@
             };
         }
         
-        // Event Listeners für die Buttons
-        document.getElementById('systemUpdateBtn').addEventListener('click', startSystemUpdate);
-
         document.getElementById('testMailBtn').addEventListener('click', function() {
             const btn = this;
             btn.disabled = true;
             btn.textContent = 'Sende...';
             const formData = new FormData(document.getElementById('form-mail'));
-            showModal('Sende Test-Mail...', 'info');
+            
+            showModal({ type: 'info', message: 'Sende Test-Mail...', isStatic: true });
+
             fetch('/api/testmail', { method: 'POST', body: formData })
                 .then(res => res.json())
-                .then(data => data.success ? showModal(data.message, 'success') : showModal(data.message, 'danger'))
-                .catch(err => showModal(`Netzwerkfehler: ${err}`, 'danger'))
+                .then(data => {
+                    showModal({
+                        type: data.success ? 'success' : 'danger',
+                        message: data.message,
+                        isStatic: true
+                    });
+                })
+                .catch(err => showModal({ type: 'danger', message: `Netzwerkfehler: ${err}`, isStatic: true }))
                 .finally(() => {
                     btn.disabled = false;
                     btn.textContent = 'Testen';
@@ -259,53 +291,71 @@
         document.getElementById('backupBtn').addEventListener('click', function() {
             const pw = document.getElementById('backup_password').value;
             if (!pw) {
-                showModal('Bitte geben Sie ein Passwort für die Verschlüsselung an.', 'warning');
+                showModal({ type: 'warning', message: 'Bitte geben Sie ein Passwort für die Verschlüsselung an.', isStatic: true });
                 return;
             }
-            const formData = new FormData(document.getElementById('form-backup'));
-            showModal('Sicherung wird erstellt...', 'info');
-            fetch('/api/backup/download', { method: 'POST', body: formData })
-                .then(async res => {
-                    if (!res.ok) {
-                        const data = await res.json().catch(() => ({message: 'Serverfehler'}));
-                        throw new Error(data.message || 'Unbekannter Fehler');
-                    }
-                    return res.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'strato_ddns_backup.json.enc';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    showModal('Sicherung wurde erfolgreich heruntergeladen.', 'success');
-                })
-                .catch(err => showModal(`Fehler bei der Sicherung: ${err.message}`, 'danger'));
+            
+            showModal({
+                type: 'info',
+                title: 'Sicherung erstellen?',
+                message: 'Möchten Sie jetzt eine verschlüsselte Sicherung Ihrer Konfiguration herunterladen?',
+                isStatic: true,
+                onConfirm: () => {
+                    const formData = new FormData();
+                    formData.append('backup_password', pw);
+                    
+                    fetch('/api/backup/download', { method: 'POST', body: formData })
+                        .then(async res => {
+                            if (!res.ok) {
+                                const data = await res.json().catch(() => ({message: 'Serverfehler'}));
+                                throw new Error(data.message || 'Unbekannter Fehler');
+                            }
+                            return res.blob();
+                        })
+                        .then(blob => {
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'strato_ddns_backup.json.enc';
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            window.URL.revokeObjectURL(url);
+                            showModal({ type: 'success', message: 'Sicherung wurde erfolgreich heruntergeladen.', isStatic: true });
+                        })
+                        .catch(err => showModal({ type: 'danger', message: `Fehler bei der Sicherung: ${err.message}`, isStatic: true }));
+                }
+            });
         });
 
         document.getElementById('restoreBtn').addEventListener('click', function() {
             const pw = document.getElementById('restore_password').value;
             const file = document.getElementById('restore_file').files[0];
             if (!pw || !file) {
-                showModal('Bitte wählen Sie eine Datei und geben Sie das Passwort an.', 'warning');
+                showModal({ type: 'warning', message: 'Bitte wählen Sie eine Datei und geben Sie das Passwort an.', isStatic: true });
                 return;
             }
-            const formData = new FormData(document.getElementById('form-restore'));
-            showModal('Sicherung wird wiederhergestellt...', 'info');
-            fetch('/api/backup/restore', { method: 'POST', body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        showModal(data.message, 'success');
-                        setTimeout(() => window.location.href = "{{ url_for('login') }}", 2000);
-                    } else {
-                        showModal(data.message, 'danger');
-                    }
-                })
-                .catch(err => showModal(`Netzwerkfehler: ${err}`, 'danger'));
+
+            showModal({
+                type: 'confirm_danger',
+                title: 'Sicherung wiederherstellen?',
+                message: 'Alle aktuellen Einstellungen werden überschrieben. Sie werden danach abgemeldet. Fortfahren?',
+                isStatic: true,
+                onConfirm: () => {
+                    const formData = new FormData(document.getElementById('form-restore'));
+                    fetch('/api/backup/restore', { method: 'POST', body: formData })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                showModal({ type: 'success', message: data.message, isStatic: true, closeOnConfirm: false });
+                                setTimeout(() => window.location.href = "{{ url_for('logout') }}", 2500);
+                            } else {
+                                showModal({ type: 'danger', message: data.message, isStatic: true });
+                            }
+                        })
+                        .catch(err => showModal({ type: 'danger', message: `Netzwerkfehler: ${err}`, isStatic: true }));
+                }
+            });
         });
     });
 </script>
