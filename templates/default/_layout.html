@@ -98,20 +98,22 @@
     </footer>
 
     <!-- Globales Modal-Fenster -->
-    <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '' }"
+    <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '', isStatic: false, closeOnConfirm: true }"
          @show-modal.window="
             show = true;
-            if ($event.detail.type !== undefined) type = $event.detail.type;
-            if ($event.detail.title !== undefined) title = $event.detail.title;
-            if ($event.detail.message !== undefined) message = $event.detail.message;
-            if ($event.detail.onConfirm !== undefined) confirmCallback = $event.detail.onConfirm;
-            if ($event.detail.showCancel !== undefined) showCancel = $event.detail.showCancel;
+            type = $event.detail.type || 'info';
+            title = $event.detail.title || '';
+            message = $event.detail.message || '';
+            confirmCallback = $event.detail.onConfirm || null;
+            showCancel = $event.detail.showCancel !== undefined ? $event.detail.showCancel : true;
             confirmDisabled = $event.detail.disableConfirm || false;
             confirmText = $event.detail.confirmText || '';
+            isStatic = $event.detail.isStatic || false;
+            closeOnConfirm = $event.detail.closeOnConfirm !== undefined ? $event.detail.closeOnConfirm : true;
          "
          x-show="show"
          x-cloak
-         @keydown.escape.window="show = false"
+         @keydown.escape.window="if (!isStatic) show = false"
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
          aria-labelledby="modal-title" role="dialog" aria-modal="true">
         
@@ -123,7 +125,7 @@
              x-transition:leave="ease-in duration-200"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             @click.away="show = false"
+             @click.away="if (!isStatic) show = false"
              @keydown.enter.prevent="
                 if (!confirmDisabled) {
                     const confirmButton = $el.querySelector('.confirm-button-js');
@@ -151,7 +153,7 @@
                     </button>
                 </template>
                 <button 
-                    @click="if (confirmCallback) { confirmCallback(); } if (!confirmCallback) { show = false; }" 
+                    @click="if (confirmCallback) { confirmCallback(); } if(closeOnConfirm) { show = false; }" 
                     type="button" 
                     class="form-button confirm-button-js"
                     :disabled="confirmDisabled"
@@ -168,8 +170,7 @@
 
     <script>
         // Globale Funktion zum Anzeigen des Modals
-        function showModal(message, type = 'info', title = '', onConfirm = null) {
-            const showCancelButton = !!onConfirm;
+        function showModal(details) {
             const typeMap = {
                 success: 'Erfolg',
                 danger: 'Fehler',
@@ -178,50 +179,28 @@
                 info: 'Information',
                 confirm_danger: 'Bestätigung erforderlich'
             };
-            const event = new CustomEvent('show-modal', {
-                detail: {
-                    type: type,
-                    title: title || typeMap[type] || 'Information',
-                    message: message,
-                    onConfirm: onConfirm,
-                    showCancel: showCancelButton
-                }
-            });
+            
+            details.title = details.title || typeMap[details.type] || 'Information';
+            if (details.onConfirm) {
+                details.showCancel = details.showCancel !== undefined ? details.showCancel : true;
+            } else {
+                details.showCancel = details.showCancel !== undefined ? details.showCancel : false;
+            }
+            
+            const event = new CustomEvent('show-modal', { detail: details });
             window.dispatchEvent(event);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             // Funktion zum Anzeigen von Flash-Nachrichten vom Server im Modal
             const flashMessages = {{ get_flashed_messages(with_categories=true) | tojson | safe }};
-            if (flashMessages) {
+            if (flashMessages && flashMessages.length > 0) {
                 flashMessages.forEach(function(flash) {
                     const category = flash[0];
                     const message = flash[1];
-                    showModal(message, category);
+                    showModal({ message: message, type: category, isStatic: true });
                 });
             }
-
-            // NEU: Globale Funktion, um Formulare mit Enter abzuschicken
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Enter') {
-                    const target = event.target;
-                    // Wir wollen das Formular nicht abschicken, wenn wir in einer Textarea sind
-                    if (target.tagName.toLowerCase() === 'textarea') {
-                        return;
-                    }
-                    // Prüfen, ob sich das Ziel in einem Formular befindet
-                    const form = target.closest('form');
-                    if (form) {
-                        // Verhindere das Standard-Enter-Verhalten (das manchmal nicht wie erwartet funktioniert)
-                        event.preventDefault();
-                        // Finde den primären Submit-Button des Formulars und klicke ihn
-                        const submitButton = form.querySelector('button[type="submit"]');
-                        if (submitButton) {
-                            submitButton.click();
-                        }
-                    }
-                }
-            });
         });
     </script>
     {% block scripts %}{% endblock %}
