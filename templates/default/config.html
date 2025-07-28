@@ -152,8 +152,9 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
+        // KORREKTUR: Syntaxfehler in der Funktionsdeklaration behoben.
         // Wrapper to handle form submissions with a confirmation modal
-        function-confirmAndSubmit(buttonId, formId, modalDetails) {
+        function confirmAndSubmit(buttonId, formId, modalDetails) {
             document.getElementById(buttonId).addEventListener('click', function(e) {
                 e.preventDefault();
                 showModal({
