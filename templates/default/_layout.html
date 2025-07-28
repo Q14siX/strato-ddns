@@ -97,6 +97,7 @@
         <a href="https://github.com/Q14siX/strato-ddns" target="_blank" class="text-white no-underline hover:text-gray-200" style="text-decoration: none;">Projektseite auf GitHub</a>
     </footer>
 
+    <!-- Globales Modal-Fenster -->
     <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '' }"
          @show-modal.window="
             show = true;
@@ -110,17 +111,9 @@
          "
          x-show="show"
          x-cloak
+         @keydown.escape.window="show = false"
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-         aria-labelledby="modal-title" role="dialog" aria-modal="true"
-         
-         @keydown.window.prevent.enter="
-            if (show && !confirmDisabled) {
-                const confirmButton = $el.querySelector('.form-button:not([disabled])');
-                if (confirmButton) {
-                    confirmButton.click();
-                }
-            }
-         ">
+         aria-labelledby="modal-title" role="dialog" aria-modal="true">
         
         <div 
              x-show="show"
@@ -130,6 +123,15 @@
              x-transition:leave="ease-in duration-200"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
+             @click.away="show = false"
+             @keydown.enter.prevent="
+                if (!confirmDisabled) {
+                    const confirmButton = $el.querySelector('.confirm-button-js');
+                    if (confirmButton) {
+                        confirmButton.click();
+                    }
+                }
+             "
              class="relative w-full max-w-lg p-6 bg-white rounded-lg shadow-xl border-t-4"
              :class="{
                  'border-red-500': ['danger', 'error', 'confirm_danger'].includes(type),
@@ -151,7 +153,7 @@
                 <button 
                     @click="if (confirmCallback) { confirmCallback(); } if (!confirmCallback) { show = false; }" 
                     type="button" 
-                    class="form-button"
+                    class="form-button confirm-button-js"
                     :disabled="confirmDisabled"
                     :class="{
                         'bg-red-600 hover:bg-red-700': type === 'confirm_danger', 
@@ -188,8 +190,8 @@
             window.dispatchEvent(event);
         }
 
-        // Funktion zum Anzeigen von Flash-Nachrichten vom Server im Modal
         document.addEventListener('DOMContentLoaded', () => {
+            // Funktion zum Anzeigen von Flash-Nachrichten vom Server im Modal
             const flashMessages = {{ get_flashed_messages(with_categories=true) | tojson | safe }};
             if (flashMessages) {
                 flashMessages.forEach(function(flash) {
@@ -198,6 +200,28 @@
                     showModal(message, category);
                 });
             }
+
+            // NEU: Globale Funktion, um Formulare mit Enter abzuschicken
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    const target = event.target;
+                    // Wir wollen das Formular nicht abschicken, wenn wir in einer Textarea sind
+                    if (target.tagName.toLowerCase() === 'textarea') {
+                        return;
+                    }
+                    // Prüfen, ob sich das Ziel in einem Formular befindet
+                    const form = target.closest('form');
+                    if (form) {
+                        // Verhindere das Standard-Enter-Verhalten (das manchmal nicht wie erwartet funktioniert)
+                        event.preventDefault();
+                        // Finde den primären Submit-Button des Formulars und klicke ihn
+                        const submitButton = form.querySelector('button[type="submit"]');
+                        if (submitButton) {
+                            submitButton.click();
+                        }
+                    }
+                }
+            });
         });
     </script>
     {% block scripts %}{% endblock %}
