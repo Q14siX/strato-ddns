@@ -6,6 +6,7 @@ import json
 import os
 import smtplib
 import subprocess
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -473,6 +474,11 @@ def system_update():
             for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
             process.wait()
+            
+            if process.returncode == 0:
+                yield f"data: \nUpdate-Skript beendet. Warte auf Neustart des Servers...\n\n"
+                time.sleep(4)
+
             event = "close" if process.returncode == 0 else "update_error"
             message = "Update erfolgreich! Anwendung wird neu gestartet." if event == "close" else f"Update fehlgeschlagen (Code: {process.returncode})."
             yield f"event: {event}\ndata: {message}\n\n"
