@@ -483,7 +483,7 @@ def system_update():
             message = "Update erfolgreich! Anwendung wird neu gestartet." if event == "close" else f"Update fehlgeschlagen (Code: {process.returncode})."
             yield f"event: {event}\ndata: {message}\n\n"
         except FileNotFoundError:
-            yield f"event: update_error\ndata: 🛑 'bash' oder 'wget' nicht gefunden.\n\n"
+            yield f"event: update_error\ndata: � 'bash' oder 'wget' nicht gefunden.\n\n"
         except Exception as e:
             yield f"event: update_error\ndata: 🛑 Kritischer Fehler: {e}\n\n"
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
