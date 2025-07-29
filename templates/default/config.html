@@ -187,7 +187,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let outputPre = null;
         let firstMessage = true;
 
-        // Hilfsfunktion, um das <pre>-Element sicher abzurufen, auch wenn das Modal neu gerendert wird.
         const getOutputElement = () => {
             if (!outputPre || !document.body.contains(outputPre)) {
                 outputPre = document.getElementById('update-output-pre');
@@ -204,7 +203,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 firstMessage = false;
             }
             pre.textContent += event.data + '\n';
-            // Korrektur 2: Sicherstellen, dass das Fenster immer nach unten scrollt.
             if (pre.parentElement) {
                 pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
             }
@@ -223,7 +221,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 isStatic: true,
                 showCancel: false,
                 onConfirm: () => {
-                    // Korrektur: Leitet zur Logout-Seite weiter, damit die Sitzung sauber beendet wird.
                     if (success) {
                         window.location.href = "{{ url_for('logout') }}";
                     }
