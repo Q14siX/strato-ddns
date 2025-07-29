@@ -223,9 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 isStatic: true,
                 showCancel: false,
                 onConfirm: () => {
-                    // Korrektur 3: Leitet direkt zur Login-Seite weiter, um "Internal Server Error" zu vermeiden.
+                    // Korrektur: Leitet zur Logout-Seite weiter, damit die Sitzung sauber beendet wird.
                     if (success) {
-                        window.location.href = "{{ url_for('login') }}";
+                        window.location.href = "{{ url_for('logout') }}";
                     }
                 }
             });
