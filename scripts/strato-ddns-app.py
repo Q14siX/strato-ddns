@@ -7,7 +7,6 @@ import os
 import smtplib
 import subprocess
 import time
-import signal
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -469,55 +468,24 @@ def api_testmail():
 @login_required
 def system_update():
     def generate_output():
+        command = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
         try:
-            # Schritt 1: Überprüfen, ob es sich um ein Git-Repository handelt
-            yield "data: Prüfe Git-Repository...\n\n"
-            if not os.path.isdir(os.path.join(BASE_DIR, '.git')):
-                raise RuntimeError("Anwendungsverzeichnis ist kein Git-Repository.")
-
-            # Schritt 2: Code von GitHub herunterladen (git fetch)
-            yield "data: Lade Änderungen von GitHub (git fetch)...\n\n"
-            fetch_process = subprocess.Popen(
-                ['git', 'fetch', 'origin', 'main'],
-                cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            )
-            for line in iter(fetch_process.stdout.readline, ''):
+            process = subprocess.Popen(['bash', '-c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+            for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
-            fetch_process.wait()
-            if fetch_process.returncode != 0:
-                raise subprocess.CalledProcessError(fetch_process.returncode, 'git fetch')
-
-            # Schritt 3: Lokalen Code auf den neuesten Stand bringen (git reset)
-            yield "data: \nSetze Anwendung auf neuesten Stand (git reset)...\n\n"
-            reset_process = subprocess.Popen(
-                ['git', 'reset', '--hard', 'origin/main'],
-                cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-            )
-            for line in iter(reset_process.stdout.readline, ''):
-                yield f"data: {line.strip()}\n\n"
-            reset_process.wait()
-            if reset_process.returncode != 0:
-                raise subprocess.CalledProcessError(reset_process.returncode, 'git reset')
-
-            # Schritt 4: Warten und Neustart auslösen
-            yield f"data: \nUpdate erfolgreich. Warte 4 Sekunden auf den Neustart...\n\n"
-            time.sleep(4)
-
-            yield f"event: close\ndata: Server wird neu gestartet. Bitte melden Sie sich erneut an.\n\n"
+            process.wait()
             
-            # Versuche einen sauberen Neustart über den Parent-Prozess (funktioniert mit Gunicorn/uWSGI)
-            os.kill(os.getppid(), signal.SIGHUP)
+            if process.returncode == 0:
+                yield f"data: \nUpdate-Skript beendet. Warte 4 Sekunden auf den Neustart...\n\n"
+                time.sleep(4)
 
-        except (subprocess.CalledProcessError, RuntimeError) as e:
-            error_message = str(e)
-            if isinstance(e, subprocess.CalledProcessError):
-                error_message = f"Fehler bei '{e.cmd}' (Code: {e.returncode})."
-            yield f"event: update_error\ndata: 🛑 {error_message}\n\n"
+            event = "close" if process.returncode == 0 else "update_error"
+            message = "Update erfolgreich! Anwendung wird neu gestartet." if event == "close" else f"Update fehlgeschlagen (Code: {process.returncode})."
+            yield f"event: {event}\ndata: {message}\n\n"
         except FileNotFoundError:
-            yield f"event: update_error\ndata: 🛑 'git' wurde nicht gefunden. Ist Git auf dem Server installiert?\n\n"
+            yield f"event: update_error\ndata: 🛑 'bash' oder 'wget' nicht gefunden.\n\n"
         except Exception as e:
-            yield f"event: update_error\ndata: 🛑 Ein unerwarteter Fehler ist aufgetreten: {e}\n\n"
-            
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler: {e}\n\n"
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
 # --- Log-Verwaltung ---
