@@ -210,8 +210,15 @@ def login_required(f):
 
 @app.before_request
 def setup_session():
+    """Wird vor jeder Anfrage ausgeführt, um die Sitzung zu konfigurieren."""
     config = load_config()
-    app.secret_key = config.get("secret_key")
+    secret = config.get("secret_key")
+    
+    if not secret:
+        app.secret_key = "temporary-secret-key-to-prevent-crash"
+    else:
+        app.secret_key = secret
+        
     app.permanent_session_lifetime = timedelta(days=30)
 
 @app.errorhandler(429)
@@ -275,7 +282,10 @@ def _perform_ddns_update(config, ip_list, trigger):
 
 @app.route('/')
 def index():
-    return redirect(url_for('log_page'))
+    """Leitet den Benutzer je nach Anmeldestatus weiter."""
+    if 'logged_in' in session:
+        return redirect(url_for('log_page'))
+    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per hour", methods=["POST"], error_message="Zu viele Login-Versuche.")
