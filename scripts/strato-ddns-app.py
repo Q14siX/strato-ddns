@@ -548,8 +548,9 @@ def system_update():
         # Der Befehl, der ausgeführt werden soll, wie vom Benutzer gewünscht.
         command_string = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
         
-        yield f"data: ⬇️ Lade und führe Skript von GitHub aus...\n\n"
-        yield f"data: Befehl: {command_string}\n\n"
+        # Korrektur 1: Die folgenden zwei Zeilen wurden entfernt, um die Startnachrichten auszublenden.
+        # yield f"data: ⬇️ Lade und führe Skript von GitHub aus...\n\n"
+        # yield f"data: Befehl: {command_string}\n\n"
 
         try:
             # Wir verwenden 'bash -c', um die vollständige Befehlszeile auszuführen.
@@ -570,7 +571,8 @@ def system_update():
             
             # Das Ergebnis prüfen und den Endstatus senden
             if process.returncode == 0:
-                yield f"event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
+                # Korrektur 3: Angepasste Nachricht für den Erfolgsfall.
+                yield f"event: close\ndata: 🔄 Update erfolgreich! Die Anwendung wird neu gestartet. Bitte melden Sie sich erneut an.\n\n"
             else:
                 yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
         except FileNotFoundError:
