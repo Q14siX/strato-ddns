@@ -164,14 +164,13 @@ document.addEventListener('DOMContentLoaded', function() {
             message: 'Die Anwendung wird aktualisiert und neu gestartet. Sie werden danach abgemeldet. <strong>Diese Aktion kann nicht abgebrochen werden.</strong> Fortfahren?',
             confirmText: 'Ja, Update starten',
             onConfirm: startSystemUpdate,
-            showCancel: false, // Korrektur: "Abbrechen"-Button ausblenden
-            isStatic: true     // Korrektur: Schließen bei Klick daneben verhindern
+            showCancel: false,
+            isStatic: true
         });
     });
 
-    // Korrigierte und robustere Funktion für den Update-Prozess
     function startSystemUpdate() {
-        const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
+        const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Update wird gestartet...\n</pre></div>`;
         
         showModal({
             type: 'warning',
@@ -188,8 +187,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let outputPre = null;
         let firstMessage = true;
 
+        // Hilfsfunktion, um das <pre>-Element sicher abzurufen, auch wenn das Modal neu gerendert wird.
         const getOutputElement = () => {
-            if (!outputPre) {
+            if (!outputPre || !document.body.contains(outputPre)) {
                 outputPre = document.getElementById('update-output-pre');
             }
             return outputPre;
@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 firstMessage = false;
             }
             pre.textContent += event.data + '\n';
+            // Korrektur 2: Sicherstellen, dass das Fenster immer nach unten scrollt.
             if (pre.parentElement) {
                 pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
             }
@@ -222,8 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 isStatic: true,
                 showCancel: false,
                 onConfirm: () => {
+                    // Korrektur 3: Leitet direkt zur Login-Seite weiter, um "Internal Server Error" zu vermeiden.
                     if (success) {
-                        window.location.href = "{{ url_for('logout') }}";
+                        window.location.href = "{{ url_for('login') }}";
                     }
                 }
             });
@@ -307,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             type: data.success ? 'success' : 'danger',
                             message: data.message,
                             isStatic: true,
-                            onConfirm: () => { if (data.success) window.location.href = "{{ url_for('logout') }}"; }
+                            onConfirm: () => { if (data.success) window.location.href = "{{ url_for('login') }}"; }
                         });
                     })
                     .catch(err => showModal({ type: 'danger', message: `Netzwerkfehler: ${err}`}));
