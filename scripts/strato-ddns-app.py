@@ -6,7 +6,6 @@ import json
 import os
 import smtplib
 import subprocess
-# import signal # Nicht mehr benötigt
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -34,7 +33,6 @@ TIMEZONE = ZoneInfo("Europe/Berlin")
 # --- Flask App Initialisierung ---
 app = Flask(__name__, template_folder=TEMPLATES_DIR)
 limiter = Limiter(key_func=get_remote_address, storage_uri="memory://", app=app)
-# Speichert fehlgeschlagene automatische Update-Versuche pro IP
 failed_attempts_auto = defaultdict(list)
 
 
@@ -46,7 +44,6 @@ def load_config():
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        # Fallback auf eine leere Konfiguration, wenn die Datei nicht existiert oder fehlerhaft ist
         return {}
 
 def save_config(config):
@@ -61,11 +58,10 @@ def initialize_app_config():
         config["secret_key"] = os.urandom(24).hex()
         save_config(config)
 
-# App-Konfiguration beim Start sicherstellen
 initialize_app_config()
 
 def get_public_ip():
-    """Ermittelt die öffentliche IP-Adresse. Gibt None bei einem Fehler zurück."""
+    """Ermittelt die öffentliche IP-Adresse."""
     try:
         response = requests.get("https://api.ipify.org", timeout=5)
         response.raise_for_status()
@@ -81,24 +77,19 @@ def derive_key(password: str) -> bytes:
 # --- Logging ---
 
 def prune_old_logs(root, retention_hours):
-    """Entfernt veraltete Log-Einträge aus dem XML-Baum."""
+    """Entfernt veraltete Log-Einträge."""
     now = datetime.now(TIMEZONE)
     cutoff = now - timedelta(hours=retention_hours)
-    to_remove = []
-    for entry in root.findall('entry'):
-        t = entry.findtext("timestamp") or ""
-        try:
-            dt = datetime.fromisoformat(t).astimezone(TIMEZONE)
-            if dt < cutoff:
-                to_remove.append(entry)
-        except ValueError:
-            # Ignoriert Einträge mit fehlerhaftem Zeitstempelformat
-            continue
+    to_remove = [
+        entry for entry in root.findall('entry')
+        if (t := entry.findtext("timestamp")) and
+           datetime.fromisoformat(t).astimezone(TIMEZONE) < cutoff
+    ]
     for entry in to_remove:
         root.remove(entry)
 
 def append_log_entries(new_entries):
-    """Fügt neue Einträge zum Log hinzu und rotiert alte Einträge."""
+    """Fügt neue Einträge zum Log hinzu."""
     config = load_config()
     retention_hours = int(config.get("log_retention_hours", 24))
     try:
@@ -113,12 +104,8 @@ def append_log_entries(new_entries):
 
         for log_data in new_entries:
             entry = ET.SubElement(root, 'entry')
-            ET.SubElement(entry, 'timestamp').text = log_data.get("timestamp")
-            ET.SubElement(entry, 'event').text = log_data.get("event")
-            ET.SubElement(entry, 'trigger').text = log_data.get("trigger")
-            ET.SubElement(entry, 'domain').text = log_data.get("domain")
-            ET.SubElement(entry, 'ip').text = log_data.get("ip")
-            ET.SubElement(entry, 'status').text = log_data.get("status")
+            for key, value in log_data.items():
+                ET.SubElement(entry, key).text = value
 
         tree.write(LOG_FILE, encoding='utf-8', xml_declaration=True)
     except (ET.ParseError, IOError) as e:
@@ -140,7 +127,7 @@ def get_mail_settings(config):
     return defaults
 
 def build_html_mail(subject, entries, timestamp_iso, event, trigger):
-    """Erstellt eine HTML-Mail, die dem Web-Design nachempfunden ist."""
+    """Erstellt eine HTML-Mail."""
     try:
         dt = datetime.fromisoformat(timestamp_iso)
         timestamp_str = dt.strftime("%d.%m.%Y - %H:%M:%S") + " Uhr"
@@ -186,22 +173,15 @@ def send_mail(config, subject, entries, timestamp_iso, event, trigger):
 def notify_on_event(config, event_type, ip="N/A"):
     """Zentrale Funktion für ereignisbasierte Benachrichtigungen."""
     ms = get_mail_settings(config)
-    if not ms.get("enabled"):
-        return
-    
-    notify = False
-    event_text = ""
-    if event_type == "badauth" and ms.get("notify_on_badauth"):
-        notify = True
-        event_text = "Login fehlgeschlagen"
-    elif event_type == "noip" and ms.get("notify_on_noip"):
-        notify = True
-        event_text = "Keine IP verfügbar"
-    elif event_type == "abuse" and ms.get("notify_on_abuse"):
-        notify = True
-        event_text = "DDNS Sperre"
+    if not ms.get("enabled"): return
 
-    if notify:
+    event_map = {
+        "badauth": "Login fehlgeschlagen",
+        "noip": "Keine IP verfügbar",
+        "abuse": "DDNS Sperre"
+    }
+    if event_type in event_map and ms.get(f"notify_on_{event_type}"):
+        event_text = event_map[event_type]
         now = datetime.now(TIMEZONE)
         timestamp = now.isoformat()
         hostnames = config.get("domains", []) or ["N/A"]
@@ -234,32 +214,26 @@ def setup_session():
     app.secret_key = config.get("secret_key")
     app.permanent_session_lifetime = timedelta(days=30)
 
-@app.errorhandler(429) # RateLimitExceeded
+@app.errorhandler(429)
 def handle_ratelimit(e):
     flash(f"Zu viele Anfragen. Limit: {e.description}", "danger")
     return render_template("login.html"), 429
 
 @app.errorhandler(404)
 def not_found(e):
-    if 'logged_in' in session:
-        return redirect(url_for('log_page'))
     return redirect(url_for('login'))
 
 
 # --- DDNS Update Core Logic ---
 
 def _perform_ddns_update(config, ip_list, trigger):
-    """
-    Zentrale Logik zur Durchführung des DDNS-Updates für eine Liste von IPs.
-    Protokolliert die Ergebnisse und versendet optional Mails.
-    """
+    """Führt das DDNS-Update durch."""
     username = config.get("username", "")
     password = config.get("password", "")
     hostnames = config.get("domains", [])
     
     results, new_log_entries = [], []
-    now = datetime.now(TIMEZONE)
-    timestamp = now.isoformat()
+    timestamp = datetime.now(TIMEZONE).isoformat()
     event = "Manuelles Update" if trigger == "manuell" else "Auto-Update"
 
     for domain in hostnames:
@@ -271,8 +245,9 @@ def _perform_ddns_update(config, ip_list, trigger):
                     params={'hostname': domain, 'myip': ip}, timeout=10
                 )
                 text_raw = resp.text.strip()
-                status = text_raw.split(" ")[0] if " " in text_raw else text_raw
-                returned_ip = text_raw.split(" ")[1] if len(text_raw.split()) > 1 else ip
+                parts = text_raw.split()
+                status = parts[0] if parts else "error"
+                returned_ip = parts[1] if len(parts) > 1 else ip
             except requests.RequestException:
                 status, returned_ip = "error", ip
 
@@ -288,14 +263,8 @@ def _perform_ddns_update(config, ip_list, trigger):
     ms = get_mail_settings(config)
     if results and ms.get("enabled"):
         statuses = {r[2].lower() for r in results}
-        should_notify = False
-        
-        if ms.get("notify_on_success") and any(s in ["good", "nochg"] for s in statuses):
-            should_notify = True
-        if ms.get("notify_on_badauth") and "badauth" in statuses:
-            should_notify = True
-        
-        if should_notify:
+        if ms.get("notify_on_success") and any(s in ["good", "nochg"] for s in statuses) or \
+           ms.get("notify_on_badauth") and "badauth" in statuses:
             subject = f"{ms.get('subject', 'Strato DDNS')} – {event}"
             send_mail(config, subject, results, timestamp, event, trigger)
     
@@ -306,9 +275,7 @@ def _perform_ddns_update(config, ip_list, trigger):
 
 @app.route('/')
 def index():
-    if 'logged_in' in session:
-        return redirect(url_for('log_page'))
-    return redirect(url_for('login'))
+    return redirect(url_for('log_page'))
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per hour", methods=["POST"], error_message="Zu viele Login-Versuche.")
@@ -318,9 +285,8 @@ def login():
         
     if request.method == 'POST':
         config = load_config()
-        user = request.form.get('username')
-        pw = request.form.get('password')
-        if user == config.get("webuser") and pw == config.get("webpass"):
+        if request.form.get('username') == config.get("webuser") and \
+           request.form.get('password') == config.get("webpass"):
             session['logged_in'] = True
             session.permanent = True
             return redirect(url_for('log_page'))
@@ -337,19 +303,16 @@ def logout():
 @login_required
 def log_page():
     entries = []
-    log_exists = os.path.exists(LOG_FILE)
-    if log_exists:
+    if os.path.exists(LOG_FILE):
         try:
             tree = ET.parse(LOG_FILE)
             root = tree.getroot()
             for entry in root.findall('entry'):
                 dt_str = entry.findtext("timestamp", "N/A")
                 try:
-                    dt_obj = datetime.fromisoformat(dt_str)
-                    display_dt = dt_obj.strftime("%d.%m.%Y %H:%M:%S")
+                    display_dt = datetime.fromisoformat(dt_str).strftime("%d.%m.%Y %H:%M:%S")
                 except (ValueError, TypeError):
                     display_dt = dt_str
-
                 entries.append({
                     "datetime": display_dt,
                     "trigger": entry.findtext("trigger", "N/A"),
@@ -360,30 +323,22 @@ def log_page():
                 })
             entries.sort(key=lambda x: x["raw_datetime"], reverse=True)
         except ET.ParseError:
-            flash("Fehler beim Lesen der Log-Datei. Sie könnte korrupt sein.", "danger")
-    return render_template("log.html", log_entries=entries, log_exists=log_exists)
+            flash("Fehler beim Lesen der Log-Datei.", "danger")
+    return render_template("log.html", log_entries=entries, log_exists=os.path.exists(LOG_FILE))
 
 @app.route('/config')
 @login_required
 def config_page():
-    config = load_config()
-    return render_template(
-        'config.html',
-        config=config,
-        mail_settings=get_mail_settings(config)
-    )
+    return render_template('config.html', config=load_config(), mail_settings=get_mail_settings(load_config()))
 
 @app.route('/webupdate')
 @login_required
 def webupdate_page():
-    config = load_config()
     ip = get_public_ip()
-    
     if not ip:
-        flash("Konnte öffentliche IP-Adresse nicht ermitteln. Bitte prüfen Sie Ihre Internetverbindung.", "danger")
+        flash("Öffentliche IP-Adresse konnte nicht ermittelt werden.", "danger")
         return redirect(url_for('config_page'))
-
-    results = _perform_ddns_update(config, [ip], "manuell")
+    results = _perform_ddns_update(load_config(), [ip], "manuell")
     return render_template('webupdate.html', ip=ip, results=results)
 
 
@@ -393,34 +348,22 @@ def webupdate_page():
 @login_required
 def api_save_access():
     config = load_config()
-    new_user = request.form.get("new_webuser", "").strip()
     new_pass = request.form.get("new_webpass", "")
-    confirm_pass = request.form.get("confirm_webpass", "")
-    
-    if new_pass and new_pass != confirm_pass:
-        flash("Die neuen Passwörter stimmen nicht überein!", "danger")
+    if new_pass and (new_pass != request.form.get("confirm_webpass", "") or len(new_pass) < 8):
+        flash("Passwörter stimmen nicht überein oder sind zu kurz (min. 8 Zeichen).", "danger")
         return redirect(url_for('config_page'))
     
-    if new_pass and len(new_pass) < 8:
-        flash("Das neue Passwort muss mindestens 8 Zeichen lang sein.", "danger")
-        return redirect(url_for('config_page'))
-
-    changes_made = False
-    if new_user:
-        config["webuser"] = new_user
-        changes_made = True
-    if new_pass:
-        config["webpass"] = new_pass
-        changes_made = True
+    if new_user := request.form.get("new_webuser", "").strip(): config["webuser"] = new_user
+    if new_pass: config["webpass"] = new_pass
         
-    if changes_made:
+    if new_user or new_pass:
         save_config(config)
-        flash("Zugangsdaten erfolgreich aktualisiert. Sie werden nun abgemeldet.", "success")
+        flash("Zugangsdaten aktualisiert. Bitte melden Sie sich neu an.", "success")
         session.clear()
         return redirect(url_for('login'))
-    else:
-        flash("Es wurden keine Änderungen vorgenommen.", "info")
-        return redirect(url_for('config_page'))
+    
+    flash("Keine Änderungen vorgenommen.", "info")
+    return redirect(url_for('config_page'))
 
 @app.route('/api/save/strato', methods=['POST'])
 @login_required
@@ -438,18 +381,21 @@ def api_save_strato():
 def api_save_mail():
     config = load_config()
     ms = config.get("mail_settings", {})
-    ms["enabled"] = "mail_enabled" in request.form
-    ms["recipients"] = request.form.get("mail_recipients", "")
-    ms["sender"] = request.form.get("mail_sender", "")
-    ms["subject"] = request.form.get("mail_subject", "")
-    ms["smtp_user"] = request.form.get("mail_smtp_user", "")
-    ms["smtp_pass"] = request.form.get("mail_smtp_pass", "")
-    ms["smtp_server"] = request.form.get("mail_smtp_server", "")
-    ms["smtp_port"] = request.form.get("mail_smtp_port", "587")
-    ms["notify_on_success"] = "mail_notify_success" in request.form
-    ms["notify_on_badauth"] = "mail_notify_badauth" in request.form
-    ms["notify_on_noip"] = "mail_notify_noip" in request.form
-    ms["notify_on_abuse"] = "mail_notify_abuse" in request.form
+    form_data = {
+        "enabled": "mail_enabled" in request.form,
+        "recipients": request.form.get("mail_recipients", ""),
+        "sender": request.form.get("mail_sender", ""),
+        "subject": request.form.get("mail_subject", ""),
+        "smtp_user": request.form.get("mail_smtp_user", ""),
+        "smtp_pass": request.form.get("mail_smtp_pass", ""),
+        "smtp_server": request.form.get("mail_smtp_server", ""),
+        "smtp_port": request.form.get("mail_smtp_port", "587"),
+        "notify_on_success": "mail_notify_success" in request.form,
+        "notify_on_badauth": "mail_notify_badauth" in request.form,
+        "notify_on_noip": "mail_notify_noip" in request.form,
+        "notify_on_abuse": "mail_notify_abuse" in request.form
+    }
+    ms.update(form_data)
     config["mail_settings"] = ms
     save_config(config)
     flash("Mail-Einstellungen gespeichert.", "success")
@@ -461,12 +407,10 @@ def api_save_log_settings():
     config = load_config()
     try:
         hours = int(request.form.get("log_retention_hours", 24))
-        if hours < 1:
-            flash("Aufbewahrungsdauer muss mindestens 1 Stunde betragen.", "danger")
-        else:
-            config["log_retention_hours"] = hours
-            save_config(config)
-            flash("Protokoll-Einstellungen gespeichert.", "success")
+        if hours < 1: raise ValueError
+        config["log_retention_hours"] = hours
+        save_config(config)
+        flash("Protokoll-Einstellungen gespeichert.", "success")
     except (ValueError, TypeError):
         flash("Ungültiger Wert für Stunden.", "danger")
     return redirect(url_for('config_page'))
@@ -476,20 +420,12 @@ def api_save_log_settings():
 def api_download_backup():
     pw = request.form.get("backup_password")
     if not pw or len(pw) < 8:
-        return jsonify(success=False, message="Ein Passwort mit mindestens 8 Zeichen ist für die Verschlüsselung erforderlich."), 400
+        return jsonify(success=False, message="Passwort mit min. 8 Zeichen erforderlich."), 400
     
-    key = derive_key(pw)
-    fernet = Fernet(key)
     try:
-        config_data = json.dumps(load_config(), indent=4).encode('utf-8')
-        encrypted = fernet.encrypt(config_data)
+        encrypted = Fernet(derive_key(pw)).encrypt(json.dumps(load_config()).encode('utf-8'))
         filename = f"backup-{datetime.now(TIMEZONE).strftime('%Y%m%d-%H%M%S')}.conf"
-        return send_file(
-            BytesIO(encrypted),
-            as_attachment=True,
-            download_name=filename,
-            mimetype="application/octet-stream"
-        )
+        return send_file(BytesIO(encrypted), as_attachment=True, download_name=filename)
     except Exception as e:
         return jsonify(success=False, message=f"Fehler bei der Sicherung: {e}"), 500
 
@@ -498,157 +434,86 @@ def api_download_backup():
 def api_restore_backup():
     pw = request.form.get("restore_password")
     file = request.files.get("restore_file")
+    if not pw or len(pw) < 8 or not file:
+        return jsonify(success=False, message="Passwort (min. 8 Zeichen) und Datei erforderlich."), 400
     
-    if not pw or len(pw) < 8:
-        return jsonify(success=False, message="Ein Passwort mit mindestens 8 Zeichen ist erforderlich."), 400
-    if not file:
-        return jsonify(success=False, message="Es wurde keine Datei für die Wiederherstellung ausgewählt."), 400
-    
-    key = derive_key(pw)
-    fernet = Fernet(key)
     try:
-        decrypted = fernet.decrypt(file.read())
-        config_data = json.loads(decrypted)
-        save_config(config_data)
-        session.clear() # Wie gewünscht, den Nutzer abmelden
-        return jsonify(success=True, message="Konfiguration erfolgreich wiederhergestellt. Sie werden nun abgemeldet.")
+        decrypted = Fernet(derive_key(pw)).decrypt(file.read())
+        save_config(json.loads(decrypted))
+        session.clear()
+        return jsonify(success=True, message="Konfiguration wiederhergestellt. Sie werden abgemeldet.")
     except Exception:
         return jsonify(success=False, message="Wiederherstellung fehlgeschlagen: Passwort falsch oder Datei beschädigt."), 400
 
 @app.route('/api/testmail', methods=['POST'])
 @login_required
 def api_testmail():
-    # Erstellt eine temporäre Konfiguration nur für den Test
-    test_config = {
-        "mail_settings": {
-            "enabled": True,
-            "recipients": request.form.get("mail_recipients"),
-            "sender": request.form.get("mail_sender"),
-            "subject": request.form.get("mail_subject"),
-            "smtp_user": request.form.get("mail_smtp_user"),
-            "smtp_pass": request.form.get("mail_smtp_pass"),
-            "smtp_server": request.form.get("mail_smtp_server"),
-            "smtp_port": request.form.get("mail_smtp_port"),
-        }
-    }
-    now = datetime.now(TIMEZONE)
-    timestamp = now.isoformat()
-    subject = f"{test_config['mail_settings']['subject']} – Testnachricht"
-    entries = [("test.domain.com", "127.0.0.1", "good")]
-    
-    success, info = send_mail(test_config, subject, entries, timestamp, "Test", "manuell")
-    
+    test_config = {"mail_settings": {k: request.form.get(f"mail_{k}") for k in ["recipients", "sender", "subject", "smtp_user", "smtp_pass", "smtp_server", "smtp_port"]}}
+    test_config["mail_settings"]["enabled"] = True
+    success, info = send_mail(test_config, f"{test_config['mail_settings']['subject']} – Test", [("test.domain.com", "127.0.0.1", "good")], datetime.now(TIMEZONE).isoformat(), "Test", "manuell")
     return jsonify(success=success, message=info)
 
-# --- SYSTEMUPDATE-FUNKTION (WUNSCHGEMÄSS ANGEPASST) ---
 @app.route('/api/system_update')
 @login_required
 def system_update():
     def generate_output():
-        # Der Befehl, der ausgeführt werden soll, wie vom Benutzer gewünscht.
-        command_string = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
-        
-        # Korrektur 1: Die folgenden zwei Zeilen wurden entfernt, um die Startnachrichten auszublenden.
-        # yield f"data: ⬇️ Lade und führe Skript von GitHub aus...\n\n"
-        # yield f"data: Befehl: {command_string}\n\n"
-
+        command = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
         try:
-            # Wir verwenden 'bash -c', um die vollständige Befehlszeile auszuführen.
-            # Dies ist für Shell-Funktionen wie 'source' und Prozesssubstitution '<(...)' erforderlich.
-            process = subprocess.Popen(
-                ['bash', '-c', command_string],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            # Die Ausgabe Zeile für Zeile streamen
+            process = subprocess.Popen(['bash', '-c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
             for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
             process.wait()
-            
-            # Das Ergebnis prüfen und den Endstatus senden
-            if process.returncode == 0:
-                # Korrektur 3: Angepasste Nachricht für den Erfolgsfall.
-                yield f"event: close\ndata: 🔄 Update erfolgreich! Die Anwendung wird neu gestartet. Bitte melden Sie sich erneut an.\n\n"
-            else:
-                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
+            event = "close" if process.returncode == 0 else "update_error"
+            message = "Update erfolgreich! Anwendung wird neu gestartet." if event == "close" else f"Update fehlgeschlagen (Code: {process.returncode})."
+            yield f"event: {event}\ndata: {message}\n\n"
         except FileNotFoundError:
-            yield f"event: update_error\ndata: 🛑 Befehl 'bash' oder 'wget' nicht gefunden. Sind die Programme auf dem Server installiert und im PATH?\n\n"
+            yield f"event: update_error\ndata: 🛑 'bash' oder 'wget' nicht gefunden.\n\n"
         except Exception as e:
-            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Updates: {e}\n\n"
-
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler: {e}\n\n"
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
-
 
 # --- Log-Verwaltung ---
 
 @app.route('/log/download_xml')
 @login_required
 def download_log_xml():
-    if not os.path.exists(LOG_FILE):
-        flash("Log-Datei nicht gefunden.", "warning")
-        return redirect(url_for('log_page'))
-    return send_file(LOG_FILE, as_attachment=True, download_name=f"{datetime.now(TIMEZONE).strftime('%Y%m%d-%H%M%S')}.xml")
+    return send_file(LOG_FILE, as_attachment=True, download_name=f"log_{datetime.now(TIMEZONE).strftime('%Y%m%d')}.xml")
 
 @app.route('/log/clear', methods=['POST'])
 @login_required
 def clear_log():
-    try:
-        if os.path.exists(LOG_FILE):
-            os.remove(LOG_FILE)
-        return jsonify(success=True, message="Protokoll wurde erfolgreich geleert.")
-    except OSError as e:
-        return jsonify(success=False, message=f"Fehler beim Löschen des Protokolls: {e}"), 500
+    if os.path.exists(LOG_FILE):
+        os.remove(LOG_FILE)
+    return jsonify(success=True, message="Protokoll geleert.")
 
-
-# --- DynDNS Auto-Update Endpunkt (für Cronjob etc.) ---
+# --- DynDNS Auto-Update Endpunkt ---
 @app.route('/update')
 def update():
     config = load_config()
     client_ip = get_remote_address()
     now = datetime.now(TIMEZONE)
     
-    # Rate-Limiting für automatische Updates
     failed_attempts_auto[client_ip] = [t for t in failed_attempts_auto.get(client_ip, []) if now - t < timedelta(hours=1)]
     if len(failed_attempts_auto.get(client_ip, [])) >= 10:
         notify_on_event(config, "abuse", client_ip)
-        return Response("abuse", mimetype='text/plain'), 429
+        return "abuse", 429
 
-    # Authentifizierung
-    req_user = request.args.get('username')
-    req_pass = request.args.get('password')
-    if not (req_user == config.get("webuser") and req_pass == config.get("webpass")):
+    if not (request.args.get('username') == config.get("webuser") and request.args.get('password') == config.get("webpass")):
         failed_attempts_auto[client_ip].append(now)
         notify_on_event(config, "badauth", client_ip)
-        return Response("badauth", mimetype='text/plain'), 401
+        return "badauth", 401
 
-    # IP-Adresse ermitteln
-    req_ip = request.args.get('myip')
-    ip_list = [i.strip() for i in req_ip.split(',') if i.strip()] if req_ip else [get_public_ip()]
-    
+    ip_list = [i.strip() for i in request.args.get('myip', '').split(',') if i.strip()] or [get_public_ip()]
     if not any(ip for ip in ip_list):
         notify_on_event(config, "noip")
-        return Response("noip", mimetype='text/plain'), 400
+        return "noip", 400
         
-    # Update durchführen
     results = _perform_ddns_update(config, ip_list, "automatisch")
     
-    # Status für den Client zurückgeben
-    overall_status = "nochg"
     status_priority = ["911", "nohost", "badauth", "notfqdn", "badagent", "abuse", "error", "good", "nochg"]
-    for _, _, status in results:
-        try:
-            if status_priority.index(status) < status_priority.index(overall_status):
-                overall_status = status
-        except ValueError:
-            overall_status = "error"
-
-    return Response(f"{overall_status} {ip_list[0] if ip_list else ''}", mimetype='text/plain')
+    overall_status = min((r[2] for r in results), key=lambda s: status_priority.index(s) if s in status_priority else 99, default="nochg")
+    return f"{overall_status} {ip_list[0] if ip_list else ''}"
 
 
 if __name__ == '__main__':
-    # Für die Produktion wird ein WSGI-Server wie Gunicorn oder uWSGI empfohlen.
     app.run(host='0.0.0.0', port=80, debug=False)
