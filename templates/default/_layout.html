@@ -15,6 +15,7 @@
         .bg-primary-darker { background-color: var(--color-primary-darker); }
         .text-primary { color: var(--color-primary); }
         .border-primary { border-color: var(--color-primary); }
+        .ring-primary { --tw-ring-color: var(--color-primary); }
         .accordion-button {
             background-color: var(--color-primary);
         }
@@ -31,9 +32,14 @@
             border-radius: 0.375rem; /* rounded-md */
             font-size: 0.875rem; /* text-sm */
             font-weight: 500; /* font-medium */
+            transition: background-color 0.2s;
         }
         .form-button:hover {
             background-color: var(--color-primary-darker);
+        }
+        .form-button:disabled {
+            background-color: #9ca3af; /* bg-gray-400 */
+            cursor: not-allowed;
         }
         .input-field {
             display: block;
@@ -47,29 +53,17 @@
         .input-field:focus {
             outline: 2px solid transparent;
             outline-offset: 2px;
-            --tw-ring-color: var(--color-primary);
             border-color: var(--color-primary);
-            box-shadow: 0 0 0 2px var(--tw-ring-color);
+            box-shadow: 0 0 0 2px var(--color-primary);
         }
-        /* Styles for table sorting */
         th.sortable {
-            cursor: pointer;
-            position: relative;
-            -webkit-user-select: none; /* Safari */
-            -ms-user-select: none; /* IE 10+ */
-            user-select: none; /* Standard syntax */
+            cursor: pointer; position: relative; user-select: none;
         }
         th.sortable::after {
-            content: ' ';
-            display: inline-block;
-            width: 1em;
-            height: 1em;
-            margin-left: 0.25rem;
-            vertical-align: middle;
+            content: ' '; display: inline-block; width: 1em; height: 1em;
+            margin-left: 0.25rem; vertical-align: middle;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-size: contain;
-            opacity: 0.4;
+            background-repeat: no-repeat; background-size: contain; opacity: 0.4;
         }
         th.sortable.asc::after {
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
@@ -82,7 +76,7 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-50">
 
     {% include '_header.html' %}
 
@@ -92,78 +86,52 @@
         </div>
     </main>
 
-    <footer class="bg-primary text-white text-center p-4">
-        © <a href="http://Q14siX.de" target="_blank" class="text-white no-underline hover:text-gray-200" style="text-decoration: none;">Q14siX.de</a> | 
-        <a href="https://github.com/Q14siX/strato-ddns" target="_blank" class="text-white no-underline hover:text-gray-200" style="text-decoration: none;">Projektseite auf GitHub</a>
+    <footer class="bg-primary text-white text-center p-4 text-sm">
+        © <a href="http://Q14siX.de" target="_blank" class="text-white hover:text-gray-200" style="text-decoration: none;">Q14siX.de</a> | 
+        <a href="https://github.com/Q14siX/strato-ddns" target="_blank" class="text-white hover:text-gray-200" style="text-decoration: none;">Projektseite auf GitHub</a>
     </footer>
 
     <!-- Globales Modal-Fenster -->
-    <div x-data="{ show: false, type: 'info', title: '', message: '', confirmCallback: null, showCancel: true, confirmDisabled: false, confirmText: '', isStatic: false, closeOnConfirm: true }"
-         @show-modal.window="
-            show = true;
-            type = $event.detail.type || 'info';
-            title = $event.detail.title || '';
-            message = $event.detail.message || '';
-            confirmCallback = $event.detail.onConfirm || null;
-            showCancel = $event.detail.showCancel !== undefined ? $event.detail.showCancel : true;
-            confirmDisabled = $event.detail.disableConfirm || false;
-            confirmText = $event.detail.confirmText || '';
-            isStatic = $event.detail.isStatic || false;
-            closeOnConfirm = $event.detail.closeOnConfirm !== undefined ? $event.detail.closeOnConfirm : true;
-         "
-         x-show="show"
+    <div x-data="modalState()"
+         @show-modal.window="show($event.detail)"
+         x-show="isOpen"
          x-cloak
-         @keydown.escape.window="if (!isStatic) show = false"
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+         @keydown.escape.window="if (!isStatic) close()"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
          aria-labelledby="modal-title" role="dialog" aria-modal="true">
         
         <div 
-             x-show="show"
+             x-show="isOpen"
              x-transition:enter="ease-out duration-300"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="ease-in duration-200"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             @click.away="if (!isStatic) show = false"
-             @keydown.enter.prevent="
-                if (!confirmDisabled) {
-                    const confirmButton = $el.querySelector('.confirm-button-js');
-                    if (confirmButton) {
-                        confirmButton.click();
-                    }
-                }
-             "
-             class="relative w-full max-w-lg p-6 bg-white rounded-lg shadow-xl border-t-4"
-             :class="{
-                 'border-red-500': ['danger', 'error', 'confirm_danger'].includes(type),
-                 'border-green-500': type === 'success',
-                 'border-yellow-500': type === 'warning',
-                 'border-primary': type === 'info'
-             }">
+             @click.away="if (!isStatic) close()"
+             class="relative w-full max-w-lg m-4 bg-white rounded-lg shadow-xl border-t-4"
+             :class="borderColor">
             
-            <h3 class="text-lg font-medium text-gray-900" x-text="title"></h3>
-            <div class="mt-2">
-                <p class="text-sm text-gray-600" x-html="message"></p>
-            </div>
-            <div class="mt-4 flex justify-end space-x-2">
-                <template x-if="showCancel">
-                    <button @click="show = false" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                        Abbrechen
+            <div class="p-6">
+                <h3 class="text-lg font-medium text-gray-900" id="modal-title" x-text="title"></h3>
+                <div class="mt-2">
+                    <div class="text-sm text-gray-600" x-html="message"></div>
+                </div>
+                <div class="mt-5 flex justify-end space-x-3">
+                    <template x-if="showCancel">
+                        <button @click="close()" type="button" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                            Abbrechen
+                        </button>
+                    </template>
+                    <button 
+                        @click="confirm()" 
+                        type="button" 
+                        class="form-button confirm-button-js"
+                        :disabled="confirmDisabled"
+                        :class="confirmButtonColor"
+                        x-text="confirmText">
                     </button>
-                </template>
-                <button 
-                    @click="if (confirmCallback) { confirmCallback(); } if(closeOnConfirm) { show = false; }" 
-                    type="button" 
-                    class="form-button confirm-button-js"
-                    :disabled="confirmDisabled"
-                    :class="{
-                        'bg-red-600 hover:bg-red-700': type === 'confirm_danger', 
-                        'bg-primary hover:bg-primary-darker': type !== 'confirm_danger',
-                        'bg-gray-400 cursor-not-allowed': confirmDisabled
-                    }"
-                    x-text="confirmText || (confirmCallback ? 'Ja, ausführen' : 'OK')">
-                </button>
+                </div>
             </div>
         </div>
     </div>
@@ -171,35 +139,68 @@
     <script>
         // Globale Funktion zum Anzeigen des Modals
         function showModal(details) {
-            const typeMap = {
-                success: 'Erfolg',
-                danger: 'Fehler',
-                error: 'Fehler',
-                warning: 'Warnung',
-                info: 'Information',
-                confirm_danger: 'Bestätigung erforderlich'
+            window.dispatchEvent(new CustomEvent('show-modal', { detail: details }));
+        }
+
+        // Alpine.js Logik für das Modal
+        function modalState() {
+            return {
+                isOpen: false,
+                type: 'info',
+                title: '',
+                message: '',
+                onConfirmCallback: null,
+                showCancel: true,
+                confirmDisabled: false,
+                confirmText: '',
+                isStatic: false,
+                closeOnConfirm: true,
+
+                get borderColor() {
+                    const colors = { danger: 'border-red-500', error: 'border-red-500', confirm_danger: 'border-red-500', success: 'border-green-500', warning: 'border-yellow-500', info: 'border-primary' };
+                    return colors[this.type] || 'border-primary';
+                },
+                get confirmButtonColor() {
+                    if (this.confirmDisabled) return 'bg-gray-400 cursor-not-allowed';
+                    const colors = { confirm_danger: 'bg-red-600 hover:bg-red-700 focus:ring-red-500' };
+                    return colors[this.type] || 'bg-primary hover:bg-primary-darker focus:ring-primary';
+                },
+
+                show(details) {
+                    const typeMap = { success: 'Erfolg', danger: 'Fehler', error: 'Fehler', warning: 'Warnung', info: 'Information', confirm_danger: 'Bestätigung erforderlich' };
+                    this.type = details.type || 'info';
+                    this.title = details.title || typeMap[this.type] || 'Information';
+                    this.message = details.message || '';
+                    this.onConfirmCallback = details.onConfirm || null;
+                    this.showCancel = details.onConfirm ? (details.showCancel !== false) : false;
+                    this.confirmDisabled = details.disableConfirm || false;
+                    this.confirmText = details.confirmText || (this.onConfirmCallback ? 'Bestätigen' : 'OK');
+                    this.isStatic = details.isStatic || false;
+                    this.closeOnConfirm = details.closeOnConfirm !== false;
+                    this.isOpen = true;
+                },
+                confirm() {
+                    if (this.onConfirmCallback) {
+                        this.onConfirmCallback();
+                    }
+                    if (this.closeOnConfirm) {
+                        this.close();
+                    }
+                },
+                close() {
+                    this.isOpen = false;
+                }
             };
-            
-            details.title = details.title || typeMap[details.type] || 'Information';
-            if (details.onConfirm) {
-                details.showCancel = details.showCancel !== undefined ? details.showCancel : true;
-            } else {
-                details.showCancel = details.showCancel !== undefined ? details.showCancel : false;
-            }
-            
-            const event = new CustomEvent('show-modal', { detail: details });
-            window.dispatchEvent(event);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             // Funktion zum Anzeigen von Flash-Nachrichten vom Server im Modal
             const flashMessages = {{ get_flashed_messages(with_categories=true) | tojson | safe }};
             if (flashMessages && flashMessages.length > 0) {
-                flashMessages.forEach(function(flash) {
-                    const category = flash[0];
-                    const message = flash[1];
-                    showModal({ message: message, type: category, isStatic: true });
-                });
+                const flash = flashMessages[0]; // Nur die erste Nachricht anzeigen, um Überflutung zu vermeiden
+                const category = flash[0];
+                const message = flash[1];
+                showModal({ message: message, type: category });
             }
         });
     </script>
