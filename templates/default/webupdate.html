@@ -1,35 +1,37 @@
 {% extends "_layout.html" %}
 
-{% block title %}Update-Ergebnis{% endblock %}
+{% block title %}Manuelles Update-Ergebnis{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
-    <div class="sm:flex sm:items-center">
+    <div class="sm:flex sm:items-center sm:justify-between">
         <div class="sm:flex-auto">
-            <h1 class="text-2xl font-bold text-gray-900">Update-Ergebnis</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Manuelles Update-Ergebnis</h1>
             <p class="mt-2 text-sm text-gray-700">Die öffentliche IP <strong class="text-gray-900 font-mono">{{ ip }}</strong> wurde an Strato gemeldet. Hier sind die Ergebnisse.</p>
         </div>
-        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-            <a href="{{ url_for('config_page') }}" class="bg-primary text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-darker">Zurück zur Konfiguration</a>
+        <div class="mt-4 sm:mt-0 sm:ml-4 sm:flex-none">
+            <a href="{{ url_for('config_page') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-darker">
+                Zurück zur Konfiguration
+            </a>
         </div>
     </div>
     <div class="mt-8 flex flex-col">
         <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
             <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
                 <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-300" id="update-table">
+                    <table class="min-w-full divide-y divide-gray-300">
                         <thead class="table-header text-white">
                             <tr>
-                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold sm:pl-6 sortable">Domain</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold sortable">Gemeldete IP</th>
-                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold sortable">Status</th>
+                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold sm:pl-6">Domain</th>
+                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold">Gemeldete IP</th>
+                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
                             {% for domain, returned_ip, result in results %}
                             <tr>
-                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                                    <a href="http://{{ domain }}" target="_blank" rel="noopener" class="text-primary hover:underline">{{ domain }}</a>
+                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-primary sm:pl-6">
+                                    <a href="http://{{ domain }}" target="_blank" rel="noopener" class="hover:underline">{{ domain }}</a>
                                 </td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 font-mono">{{ returned_ip }}</td>
                                 <td class="whitespace-nowrap px-3 py-4 text-sm">
@@ -42,6 +44,13 @@
                                     </span>
                                 </td>
                             </tr>
+                            {% else %}
+                            <tr>
+                               <td colspan="3" class="px-6 py-16 text-center text-sm text-gray-500">
+                                    <h3 class="text-sm font-medium text-gray-900">Keine Domains konfiguriert</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Es wurde kein Update durchgeführt, da keine Domains in der <a href="{{ url_for('config_page') }}" class="text-primary hover:underline">Konfiguration</a> hinterlegt sind.</p>
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -50,41 +59,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    function makeTableSortable(tableId) {
-        const table = document.getElementById(tableId);
-        if (!table) return;
-        const headers = table.querySelectorAll('th.sortable');
-        const tbody = table.querySelector('tbody');
-
-        headers.forEach((header, index) => {
-            header.addEventListener('click', () => {
-                const rows = Array.from(tbody.querySelectorAll('tr'));
-                const isAsc = header.classList.contains('asc');
-                const direction = isAsc ? -1 : 1;
-
-                headers.forEach(h => h.classList.remove('asc', 'desc'));
-                header.classList.toggle('asc', !isAsc);
-                header.classList.toggle('desc', isAsc);
-
-                rows.sort((rowA, rowB) => {
-                    let cellA = rowA.children[index].innerText.trim();
-                    let cellB = rowB.children[index].innerText.trim();
-
-                    return cellA.localeCompare(cellB, 'de', { numeric: true, sensitivity: 'base' }) * direction;
-                });
-
-                tbody.innerHTML = '';
-                rows.forEach(row => tbody.appendChild(row));
-            });
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        makeTableSortable('update-table');
-    });
-</script>
 {% endblock %}
