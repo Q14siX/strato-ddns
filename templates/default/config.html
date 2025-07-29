@@ -163,47 +163,77 @@ document.addEventListener('DOMContentLoaded', function() {
             title: 'Systemupdate starten?',
             message: 'Die Anwendung wird aktualisiert und neu gestartet. Sie werden danach abgemeldet. <strong>Diese Aktion kann nicht abgebrochen werden.</strong> Fortfahren?',
             confirmText: 'Ja, Update starten',
-            onConfirm: startSystemUpdate
+            onConfirm: startSystemUpdate,
+            showCancel: false, // Korrektur: "Abbrechen"-Button ausblenden
+            isStatic: true     // Korrektur: Schließen bei Klick daneben verhindern
         });
     });
 
+    // Korrigierte und robustere Funktion für den Update-Prozess
     function startSystemUpdate() {
         const updateMessage = `<div class="mt-4 p-4 bg-gray-900 text-white font-mono text-sm rounded-md overflow-y-auto" style="height: 250px;"><pre id="update-output-pre" class="whitespace-pre-wrap">Verbindung wird hergestellt...\n</pre></div>`;
         
         showModal({
-            type: 'warning', title: 'Systemupdate läuft...', message: updateMessage,
-            showCancel: false, disableConfirm: true, confirmText: 'Update läuft...',
-            isStatic: true, closeOnConfirm: false
+            type: 'warning',
+            title: 'Systemupdate läuft...',
+            message: updateMessage,
+            showCancel: false,
+            disableConfirm: true,
+            confirmText: 'Update läuft...',
+            isStatic: true,
+            closeOnConfirm: false
         });
 
         const evtSource = new EventSource("{{ url_for('system_update') }}");
-        const outputPre = document.getElementById('update-output-pre');
+        let outputPre = null;
+        let firstMessage = true;
 
-        evtSource.onmessage = function(event) {
-            if (outputPre.textContent.startsWith('Verbindung wird hergestellt...')) {
-                outputPre.textContent = ''; 
+        const getOutputElement = () => {
+            if (!outputPre) {
+                outputPre = document.getElementById('update-output-pre');
             }
-            outputPre.textContent += event.data + '\n';
-            outputPre.parentElement.scrollTop = outputPre.parentElement.scrollHeight;
+            return outputPre;
         };
 
-        const onUpdateFinish = (success, message) => {
+        evtSource.onmessage = function(event) {
+            const pre = getOutputElement();
+            if (!pre) return;
+
+            if (firstMessage) {
+                pre.textContent = '';
+                firstMessage = false;
+            }
+            pre.textContent += event.data + '\n';
+            if (pre.parentElement) {
+                pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
+            }
+        };
+
+        const onUpdateFinish = (success, data) => {
             evtSource.close();
-            const finalMessage = document.getElementById('update-output-pre').parentElement.outerHTML;
-            
+            const pre = getOutputElement();
+            const finalMessage = pre && pre.parentElement ? pre.parentElement.outerHTML : `<p>${data || ''}</p>`;
+
             showModal({
                 type: success ? 'success' : 'danger',
                 title: success ? 'Update erfolgreich' : 'Update fehlgeschlagen',
                 message: finalMessage,
                 confirmText: 'OK',
                 isStatic: true,
-                onConfirm: () => { if (success) window.location.href = "{{ url_for('logout') }}"; }
+                showCancel: false,
+                onConfirm: () => {
+                    if (success) {
+                        window.location.href = "{{ url_for('logout') }}";
+                    }
+                }
             });
         };
 
         evtSource.addEventListener("close", (event) => onUpdateFinish(true, event.data));
         evtSource.addEventListener("update_error", (event) => onUpdateFinish(false, event.data));
-        evtSource.onerror = () => onUpdateFinish(false, "Verbindung zum Server verloren.");
+        evtSource.onerror = () => {
+            onUpdateFinish(false, "Verbindung zum Server verloren oder Update-Skript konnte nicht gestartet werden.");
+        };
     }
     
     // --- Test-Mail ---
