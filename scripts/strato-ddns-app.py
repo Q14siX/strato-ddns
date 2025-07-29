@@ -468,24 +468,32 @@ def api_testmail():
 @login_required
 def system_update():
     def generate_output():
-        command = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
+        command = 'source <(wget --timeout=10 -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
         try:
-            process = subprocess.Popen(['bash', '-c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+            process = subprocess.Popen(
+                ['bash', '-c', command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
             for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
             process.wait()
             
             if process.returncode == 0:
-                yield f"data: \nUpdate-Skript beendet. Warte 4 Sekunden auf den Neustart...\n\n"
-                time.sleep(4)
-
-            event = "close" if process.returncode == 0 else "update_error"
-            message = "Update erfolgreich! Anwendung wird neu gestartet." if event == "close" else f"Update fehlgeschlagen (Code: {process.returncode})."
-            yield f"event: {event}\ndata: {message}\n\n"
+                yield f"data: \nUpdate-Skript beendet. Warte 10 Sekunden auf den Neustart...\n\n"
+                time.sleep(10)
+                yield f"event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
+            else:
+                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
         except FileNotFoundError:
-            yield f"event: update_error\ndata: � 'bash' oder 'wget' nicht gefunden.\n\n"
+            yield f"event: update_error\ndata: 🛑 'bash' oder 'wget' nicht gefunden. Sind die Programme auf dem Server installiert und im PATH?\n\n"
         except Exception as e:
-            yield f"event: update_error\ndata: 🛑 Kritischer Fehler: {e}\n\n"
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Updates: {e}\n\n"
+
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
 # --- Log-Verwaltung ---
