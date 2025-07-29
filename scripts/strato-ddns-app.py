@@ -6,6 +6,7 @@ import json
 import os
 import smtplib
 import subprocess
+# import signal # Nicht mehr benötigt
 from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -539,18 +540,22 @@ def api_testmail():
     
     return jsonify(success=success, message=info)
 
+# --- SYSTEMUPDATE-FUNKTION (WUNSCHGEMÄSS ANGEPASST) ---
 @app.route('/api/system_update')
 @login_required
 def system_update():
     def generate_output():
-        script_path = os.path.join(BASE_DIR, 'scripts', 'strato-ddns-webupdate.sh')
-        if not os.path.exists(script_path):
-             yield f"event: update_error\ndata: 🛑 Update-Skript nicht gefunden unter {script_path}\n\n"
-             return
+        # Der Befehl, der ausgeführt werden soll, wie vom Benutzer gewünscht.
+        command_string = 'source <(wget -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
+        
+        yield f"data: ⬇️ Lade und führe Skript von GitHub aus...\n\n"
+        yield f"data: Befehl: {command_string}\n\n"
 
         try:
+            # Wir verwenden 'bash -c', um die vollständige Befehlszeile auszuführen.
+            # Dies ist für Shell-Funktionen wie 'source' und Prozesssubstitution '<(...)' erforderlich.
             process = subprocess.Popen(
-                ['bash', script_path],
+                ['bash', '-c', command_string],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -558,14 +563,18 @@ def system_update():
                 universal_newlines=True
             )
             
+            # Die Ausgabe Zeile für Zeile streamen
             for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
             process.wait()
             
+            # Das Ergebnis prüfen und den Endstatus senden
             if process.returncode == 0:
                 yield f"event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
             else:
                 yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
+        except FileNotFoundError:
+            yield f"event: update_error\ndata: 🛑 Befehl 'bash' oder 'wget' nicht gefunden. Sind die Programme auf dem Server installiert und im PATH?\n\n"
         except Exception as e:
             yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Updates: {e}\n\n"
 
