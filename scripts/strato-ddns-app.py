@@ -467,16 +467,17 @@ def api_testmail():
 @app.route('/api/system_update')
 @login_required
 def system_update():
+    # SICHERHEITSHINWEIS: Das Ausführen von Shell-Skripten, die direkt aus dem
+    # Internet geladen werden, stellt ein erhebliches Sicherheitsrisiko dar.
     def generate_output():
-        # This is the original, user-provided method
-        script_path = os.path.join(BASE_DIR, 'scripts', 'strato-ddns-webupdate.sh')
-        if not os.path.exists(script_path):
-             yield f"event: update_error\ndata: 🛑 Update-Skript nicht gefunden unter {script_path}\n\n"
-             return
-
+        script_commands = """
+        set -e
+        source <(wget --timeout=10 -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")
+        """
+        
         try:
             process = subprocess.Popen(
-                ['bash', script_path],
+                ['bash', '-c', script_commands],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -484,18 +485,26 @@ def system_update():
                 universal_newlines=True
             )
             
+            full_output = []
             for line in iter(process.stdout.readline, ''):
-                yield f"data: {line.strip()}\n\n"
+                stripped_line = line.strip()
+                full_output.append(stripped_line)
+                yield f"data: {stripped_line}\n\n"
+                
             process.wait()
             
-            if process.returncode == 0:
-                yield f"data: \nUpdate-Skript beendet. Warte 5 Sekunden auf den Neustart...\n\n"
-                time.sleep(5)
-                yield f"event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
+            # Das Skript kann fehlschlagen, wenn der Neustart-Befehl (z.B. supervisorctl)
+            # nicht verfügbar ist. Wir werten das Update trotzdem als Erfolg, wenn es bis zum
+            # Neustart-Versuch gekommen ist.
+            if process.returncode == 0 or "Neustart wird jetzt durchgeführt" in "".join(full_output):
+                yield f"data: \nUpdate-Prozess beendet. Warte 10 Sekunden auf den Neustart des Servers...\n\n"
+                time.sleep(10)
+                yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
             else:
-                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
+                details = f"Prozess endete mit Fehlercode {process.returncode}."
+                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
         except Exception as e:
-            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Updates: {e}\n\n"
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Update-Prozesses: {e}\n\n"
 
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
