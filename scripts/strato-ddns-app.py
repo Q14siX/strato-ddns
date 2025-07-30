@@ -467,11 +467,25 @@ def api_testmail():
 @app.route('/api/system_update')
 @login_required
 def system_update():
+    # SICHERHEITSHINWEIS: Das Ausführen von Shell-Skripten, die direkt aus dem
+    # Internet geladen werden, stellt ein erhebliches Sicherheitsrisiko dar.
+    # Dieser Code erlaubt potenziell die Ausführung von beliebigem Code auf dem Server,
+    # wenn die Quelle (GitHub-Repository) kompromittiert wird.
+    # DIESE FUNKTION SOLLTE NUR IN EINER KONTROLLIERTEN UMGEBUNG UND MIT
+    # VOLLEM BEWUSSTSEIN DER RISIKEN VERWENDET WERDEN.
     def generate_output():
-        command = 'source <(wget --timeout=10 -qO- "https://raw.githubusercontent.com/Q14siX/strato-ddns/main/scripts/strato-ddns-webupdate.sh")'
+        script_commands = """
+        set -e
+        
+        export REPO_URL="https://raw.githubusercontent.com/Q14siX/strato-ddns/main"
+        export APP_DIR="/opt/strato-ddns"
+        
+        source <(wget -qO- "$REPO_URL/scripts/strato-ddns-webupdate.sh")
+        """
+        
         try:
             process = subprocess.Popen(
-                ['bash', '-c', command],
+                ['bash', '-c', script_commands],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -481,18 +495,19 @@ def system_update():
             
             for line in iter(process.stdout.readline, ''):
                 yield f"data: {line.strip()}\n\n"
+                
             process.wait()
             
             if process.returncode == 0:
                 yield f"data: \nUpdate-Skript beendet. Warte 10 Sekunden auf den Neustart...\n\n"
                 time.sleep(10)
-                yield f"event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
+                yield "event: close\ndata: 🔄 Update erfolgreich abgeschlossen! Sie werden nun abgemeldet.\n\n"
             else:
-                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen (Fehlercode: {process.returncode}).\n\n"
-        except FileNotFoundError:
-            yield f"event: update_error\ndata: 🛑 'bash' oder 'wget' nicht gefunden. Sind die Programme auf dem Server installiert und im PATH?\n\n"
+                details = f"Prozess endete mit Fehlercode {process.returncode}."
+                yield f"event: update_error\ndata: 🛑 Update fehlgeschlagen... Details: {details}\n\n"
         except Exception as e:
-            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Updates: {e}\n\n"
+            yield f"event: update_error\ndata: 🛑 Kritischer Fehler beim Starten des Update-Prozesses: {e}\n\n"
+
 
     return Response(stream_with_context(generate_output()), mimetype='text/event-stream')
 
