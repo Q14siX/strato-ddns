@@ -4,7 +4,7 @@
 [![Version](https://img.shields.io/github/v/release/Q14siX/strato-ddns)](https://github.com/Q14siX/strato-ddns/releases)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Bash](https://img.shields.io/badge/script-bash-blue.svg)
-![Status](https://img.shields.io/badge/status-stable-brightgreen.svg)
+![Status](https://img.shields.io/badge/status-beta-brightgreen.svg)
 ![Downloads](https://img.shields.io/github/downloads/Q14siX/strato-ddns/total)
 
 **Self-hosted Updater-Dienst für Strato-Domains mit Weboberfläche, Logging und einfacher Integration z.B. in die Fritz!Box als DynDNS-Client.**
